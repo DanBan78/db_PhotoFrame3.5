@@ -1,0 +1,532 @@
+24.11.2025 20:45:33 [DEBUG] HW revision: A
+24.11.2025 20:45:33 [DEBUG] Static COM port: COM3
+24.11.2025 20:45:33 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 20:47:18 [WARNING] (Write line) Too fast! Slow down!
+24.11.2025 20:47:18 [WARNING] (Write line) Too fast! Slow down!
+24.11.2025 20:47:20 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 115, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 142, in shutdown
+    sys.exit(0)
+SystemExit: 0
+24.11.2025 20:47:23 [DEBUG] HW revision: A
+24.11.2025 20:47:23 [DEBUG] Static COM port: COM3
+24.11.2025 20:47:23 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 20:50:25 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 115, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 142, in shutdown
+    sys.exit(0)
+SystemExit: 0
+24.11.2025 21:07:31 [DEBUG] HW revision: A
+24.11.2025 21:07:31 [DEBUG] Static COM port: COM3
+24.11.2025 21:07:31 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 21:08:29 [ERROR] SerialException: Failed to send serial data to device. Closing and reopening COM port before retrying once.
+24.11.2025 21:08:30 [DEBUG] Static COM port: COM3
+24.11.2025 21:12:23 [DEBUG] HW revision: A
+24.11.2025 21:12:23 [DEBUG] Static COM port: COM3
+24.11.2025 21:12:23 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 21:13:09 [DEBUG] HW revision: A
+24.11.2025 21:13:09 [DEBUG] Static COM port: COM3
+24.11.2025 21:13:09 [ERROR] Cannot open COM port COM3: could not open port 'COM3': PermissionError(13, 'Odmowa dostêpu.', None, 5)
+24.11.2025 21:15:03 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 116, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 143, in shutdown
+    sys.exit(0)
+SystemExit: 0
+24.11.2025 21:15:25 [DEBUG] HW revision: A
+24.11.2025 21:15:25 [DEBUG] Static COM port: COM3
+24.11.2025 21:15:25 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 21:20:43 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 116, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 143, in shutdown
+    sys.exit(0)
+SystemExit: 0
+24.11.2025 21:21:58 [DEBUG] HW revision: A
+24.11.2025 21:21:58 [DEBUG] Static COM port: COM3
+24.11.2025 21:21:58 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 21:23:26 [ERROR] SerialException: Failed to send serial data to device. Closing and reopening COM port before retrying once.
+24.11.2025 21:23:27 [DEBUG] Static COM port: COM3
+24.11.2025 21:23:27 [ERROR] Cannot open COM port COM3: could not open port 'COM3': FileNotFoundError(2, 'Nie mo¿na odnaleŸæ okreœlonego pliku.', None, 2)
+24.11.2025 21:24:29 [DEBUG] HW revision: A
+24.11.2025 21:24:29 [DEBUG] Static COM port: COM3
+24.11.2025 21:24:29 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 21:31:31 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 117, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 155, in shutdown
+    sys.exit(0)
+SystemExit: 0
+24.11.2025 21:33:19 [DEBUG] HW revision: A
+24.11.2025 21:33:19 [DEBUG] Static COM port: COM3
+24.11.2025 21:33:19 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 21:36:33 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 117, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 155, in shutdown
+    sys.exit(0)
+SystemExit: 0
+24.11.2025 21:36:43 [DEBUG] HW revision: A
+24.11.2025 21:36:43 [DEBUG] Static COM port: COM3
+24.11.2025 21:36:43 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 21:38:00 [ERROR] SerialException: Failed to send serial data to device. Closing and reopening COM port before retrying once.
+24.11.2025 21:38:01 [DEBUG] Static COM port: COM3
+24.11.2025 21:38:01 [ERROR] Cannot open COM port COM3: could not open port 'COM3': FileNotFoundError(2, 'Nie mo¿na odnaleŸæ okreœlonego pliku.', None, 2)
+24.11.2025 21:38:44 [DEBUG] HW revision: A
+24.11.2025 21:38:44 [DEBUG] Static COM port: COM3
+24.11.2025 21:38:44 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 21:40:16 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 117, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 155, in shutdown
+    sys.exit(0)
+SystemExit: 0
+24.11.2025 21:40:18 [DEBUG] HW revision: A
+24.11.2025 21:40:18 [DEBUG] Static COM port: COM3
+24.11.2025 21:40:18 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 21:46:52 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 117, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 155, in shutdown
+    sys.exit(0)
+SystemExit: 0
+24.11.2025 21:49:35 [DEBUG] HW revision: A
+24.11.2025 21:49:35 [DEBUG] Static COM port: COM3
+24.11.2025 21:49:35 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 21:53:24 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 117, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 155, in shutdown
+    sys.exit(0)
+SystemExit: 0
+24.11.2025 21:53:55 [DEBUG] HW revision: A
+24.11.2025 21:53:55 [DEBUG] Static COM port: COM3
+24.11.2025 21:53:55 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 21:56:49 [DEBUG] HW revision: A
+24.11.2025 21:56:49 [DEBUG] Static COM port: COM3
+24.11.2025 21:56:49 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 21:58:08 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 117, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 155, in shutdown
+    sys.exit(0)
+SystemExit: 0
+24.11.2025 21:58:28 [DEBUG] HW revision: A
+24.11.2025 21:58:28 [DEBUG] Static COM port: COM3
+24.11.2025 21:58:28 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:02:31 [DEBUG] HW revision: A
+24.11.2025 22:02:31 [DEBUG] Static COM port: COM3
+24.11.2025 22:02:31 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:03:54 [DEBUG] HW revision: A
+24.11.2025 22:03:54 [DEBUG] Static COM port: COM3
+24.11.2025 22:03:54 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:06:28 [DEBUG] HW revision: A
+24.11.2025 22:06:28 [DEBUG] Static COM port: COM3
+24.11.2025 22:06:28 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:07:48 [DEBUG] HW revision: A
+24.11.2025 22:07:48 [DEBUG] Static COM port: COM3
+24.11.2025 22:07:48 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:08:58 [DEBUG] HW revision: A
+24.11.2025 22:08:58 [DEBUG] Static COM port: COM3
+24.11.2025 22:08:58 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:10:46 [DEBUG] HW revision: A
+24.11.2025 22:10:46 [DEBUG] Static COM port: COM3
+24.11.2025 22:10:46 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:13:57 [DEBUG] HW revision: A
+24.11.2025 22:13:57 [DEBUG] Static COM port: COM3
+24.11.2025 22:13:57 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:17:43 [DEBUG] HW revision: A
+24.11.2025 22:17:43 [DEBUG] Static COM port: COM3
+24.11.2025 22:17:43 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:19:08 [DEBUG] HW revision: A
+24.11.2025 22:19:08 [DEBUG] Static COM port: COM3
+24.11.2025 22:19:08 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:22:30 [DEBUG] HW revision: A
+24.11.2025 22:22:30 [DEBUG] Static COM port: COM3
+24.11.2025 22:22:30 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:23:35 [DEBUG] HW revision: A
+24.11.2025 22:23:35 [DEBUG] Static COM port: COM3
+24.11.2025 22:23:35 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:24:39 [DEBUG] HW revision: A
+24.11.2025 22:24:39 [DEBUG] Static COM port: COM3
+24.11.2025 22:24:39 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:25:26 [DEBUG] HW revision: A
+24.11.2025 22:25:26 [DEBUG] Static COM port: COM3
+24.11.2025 22:25:26 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:26:32 [DEBUG] HW revision: A
+24.11.2025 22:26:32 [DEBUG] Static COM port: COM3
+24.11.2025 22:26:32 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:26:53 [DEBUG] HW revision: A
+24.11.2025 22:26:53 [DEBUG] Static COM port: COM3
+24.11.2025 22:26:53 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:27:27 [DEBUG] HW revision: A
+24.11.2025 22:27:27 [DEBUG] Static COM port: COM3
+24.11.2025 22:27:27 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:30:31 [DEBUG] HW revision: A
+24.11.2025 22:30:31 [DEBUG] Static COM port: COM3
+24.11.2025 22:30:31 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:31:38 [DEBUG] HW revision: A
+24.11.2025 22:31:38 [DEBUG] Static COM port: COM3
+24.11.2025 22:31:38 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:32:32 [DEBUG] HW revision: A
+24.11.2025 22:32:32 [DEBUG] Static COM port: COM3
+24.11.2025 22:32:32 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:33:54 [DEBUG] HW revision: A
+24.11.2025 22:33:54 [DEBUG] Static COM port: COM3
+24.11.2025 22:33:54 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:34:57 [DEBUG] HW revision: A
+24.11.2025 22:34:57 [DEBUG] Static COM port: COM3
+24.11.2025 22:34:58 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:35:09 [DEBUG] HW revision: A
+24.11.2025 22:35:09 [DEBUG] Static COM port: COM3
+24.11.2025 22:35:09 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:36:07 [DEBUG] HW revision: A
+24.11.2025 22:36:07 [DEBUG] Static COM port: COM3
+24.11.2025 22:36:07 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:39:06 [DEBUG] HW revision: A
+24.11.2025 22:39:06 [DEBUG] Static COM port: COM3
+24.11.2025 22:39:06 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:44:54 [DEBUG] HW revision: A
+24.11.2025 22:44:54 [DEBUG] Static COM port: COM3
+24.11.2025 22:44:54 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:47:01 [DEBUG] HW revision: A
+24.11.2025 22:47:01 [DEBUG] Static COM port: COM3
+24.11.2025 22:47:01 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 22:50:30 [ERROR] SerialException: Failed to send serial data to device. Closing and reopening COM port before retrying once.
+24.11.2025 22:50:31 [DEBUG] Static COM port: COM3
+24.11.2025 22:50:31 [ERROR] Cannot open COM port COM3: could not open port 'COM3': FileNotFoundError(2, 'Nie mo¿na odnaleŸæ okreœlonego pliku.', None, 2)
+24.11.2025 22:50:53 [DEBUG] HW revision: A
+24.11.2025 22:50:53 [DEBUG] Static COM port: COM3
+24.11.2025 22:50:53 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 23:02:38 [DEBUG] HW revision: A
+24.11.2025 23:02:38 [DEBUG] Static COM port: COM3
+24.11.2025 23:02:38 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+24.11.2025 23:06:02 [DEBUG] HW revision: A
+24.11.2025 23:06:02 [DEBUG] Static COM port: COM3
+24.11.2025 23:06:02 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+25.11.2025 17:48:42 [DEBUG] HW revision: A
+25.11.2025 17:48:42 [DEBUG] Static COM port: COM3
+25.11.2025 17:48:42 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+25.11.2025 21:17:19 [DEBUG] HW revision: A
+25.11.2025 21:17:19 [DEBUG] Static COM port: COM3
+25.11.2025 21:17:19 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+25.11.2025 21:18:24 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 198, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 236, in shutdown
+    sys.exit(0)
+SystemExit: 0
+25.11.2025 22:28:10 [DEBUG] HW revision: A
+25.11.2025 22:28:10 [DEBUG] Static COM port: COM3
+25.11.2025 22:28:10 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+25.11.2025 22:30:07 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 195, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 233, in shutdown
+    sys.exit(0)
+SystemExit: 0
+25.11.2025 22:30:11 [DEBUG] HW revision: A
+25.11.2025 22:30:11 [DEBUG] Static COM port: COM3
+25.11.2025 22:30:11 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+25.11.2025 22:31:07 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 195, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 233, in shutdown
+    sys.exit(0)
+SystemExit: 0
+25.11.2025 22:39:59 [DEBUG] HW revision: A
+25.11.2025 22:39:59 [DEBUG] Static COM port: COM3
+25.11.2025 22:39:59 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+25.11.2025 22:40:40 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 195, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 233, in shutdown
+    sys.exit(0)
+SystemExit: 0
+25.11.2025 22:50:06 [DEBUG] HW revision: A
+25.11.2025 22:50:06 [DEBUG] Static COM port: COM3
+25.11.2025 22:50:06 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+25.11.2025 22:52:14 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 22:52:14 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 22:56:36 [DEBUG] HW revision: A
+25.11.2025 22:56:36 [DEBUG] Static COM port: COM3
+25.11.2025 22:56:36 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+25.11.2025 22:56:49 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 195, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 233, in shutdown
+    sys.exit(0)
+SystemExit: 0
+25.11.2025 22:57:18 [DEBUG] HW revision: A
+25.11.2025 22:57:18 [DEBUG] Static COM port: COM3
+25.11.2025 22:57:18 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+25.11.2025 22:57:34 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 195, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 233, in shutdown
+    sys.exit(0)
+SystemExit: 0
+25.11.2025 23:00:21 [DEBUG] HW revision: A
+25.11.2025 23:00:21 [DEBUG] Static COM port: COM3
+25.11.2025 23:00:21 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+25.11.2025 23:01:27 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 197, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 235, in shutdown
+    sys.exit(0)
+SystemExit: 0
+25.11.2025 23:01:59 [DEBUG] HW revision: A
+25.11.2025 23:01:59 [DEBUG] Static COM port: COM3
+25.11.2025 23:01:59 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+25.11.2025 23:04:46 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 197, in exit_app
+    # action on most platforms/backends. If your backend still doesn't activate
+        ^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 235, in shutdown
+    self.display.close()
+    ^^^^^^^^^^^
+SystemExit: 0
+25.11.2025 23:04:49 [DEBUG] HW revision: A
+25.11.2025 23:04:49 [DEBUG] Static COM port: COM3
+25.11.2025 23:04:49 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+25.11.2025 23:05:20 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 204, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 242, in shutdown
+    sys.exit(0)
+SystemExit: 0
+25.11.2025 23:07:21 [DEBUG] HW revision: A
+25.11.2025 23:07:21 [DEBUG] Static COM port: COM3
+25.11.2025 23:07:21 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+25.11.2025 23:07:32 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:07:32 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:07:44 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:07:44 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:08:03 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "D:\Github\PhotoFrame-Clean\.venv\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 207, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 245, in shutdown
+    sys.exit(0)
+SystemExit: 0

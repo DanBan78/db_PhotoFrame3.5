@@ -1,0 +1,35 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+env/
+venv/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Local tools and editors
+tools/
+.vscode/
+.idea/
+
+# PyInstaller artifacts
+*.manifest
+
+# Logs and temp files
+*.log
+tmp/
+tray_events.log
+tray_test.log
+
+# Ignore user-specific files
+*.swp
+*.swo
+
+# Optional: ignore res temp files
+temp/
