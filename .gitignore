@@ -18,6 +18,9 @@ tools/
 .vscode/
 .idea/
 
+# Log files
+log.log
+
 # PyInstaller artifacts
 *.manifest
 

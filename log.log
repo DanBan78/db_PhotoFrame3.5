@@ -530,3 +530,339 @@ Traceback (most recent call last):
   File "D:\Github\PhotoFrame-Clean\main.py", line 245, in shutdown
     sys.exit(0)
 SystemExit: 0
+25.11.2025 23:18:05 [DEBUG] HW revision: A
+25.11.2025 23:18:05 [DEBUG] Static COM port: COM3
+25.11.2025 23:18:05 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+25.11.2025 23:18:17 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:18:17 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:18:17 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:18:17 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:18:35 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 206, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 244, in shutdown
+    sys.exit(0)
+SystemExit: 0
+25.11.2025 23:21:04 [DEBUG] HW revision: A
+25.11.2025 23:21:04 [DEBUG] Static COM port: COM3
+25.11.2025 23:21:04 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+25.11.2025 23:21:27 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:21:27 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:22:19 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:22:19 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:23:10 [DEBUG] HW revision: A
+25.11.2025 23:23:10 [DEBUG] Static COM port: COM3
+25.11.2025 23:23:10 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+25.11.2025 23:23:34 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:23:34 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:23:46 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 203, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 241, in shutdown
+    sys.exit(0)
+SystemExit: 0
+25.11.2025 23:25:32 [DEBUG] HW revision: A
+25.11.2025 23:25:32 [DEBUG] Static COM port: COM3
+25.11.2025 23:25:32 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+25.11.2025 23:25:45 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:25:45 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:25:56 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:25:56 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:26:09 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:26:09 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:26:20 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:26:20 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:26:55 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:26:55 [WARNING] (Write line) Too fast! Slow down!
+25.11.2025 23:26:56 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 165, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 203, in shutdown
+    sys.exit(0)
+SystemExit: 0
+25.11.2025 23:27:49 [DEBUG] HW revision: A
+25.11.2025 23:27:49 [DEBUG] Static COM port: COM3
+25.11.2025 23:27:49 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+25.11.2025 23:40:43 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 203, in exit_app
+    """Trigger reload of configuration in PhotoFrame and Display."""
+    ^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 241, in shutdown
+SystemExit: 0
+26.11.2025 16:54:02 [DEBUG] HW revision: A
+26.11.2025 16:54:02 [DEBUG] Static COM port: COM3
+26.11.2025 16:54:02 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+26.11.2025 16:56:09 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 16:56:09 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 18:34:39 [DEBUG] HW revision: A
+26.11.2025 18:34:39 [DEBUG] Static COM port: COM3
+26.11.2025 18:34:39 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+26.11.2025 18:34:51 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 18:34:51 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 18:34:52 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 18:34:52 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 18:38:43 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 18:38:43 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 18:41:17 [DEBUG] HW revision: A
+26.11.2025 18:41:17 [DEBUG] Static COM port: COM3
+26.11.2025 18:41:17 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+26.11.2025 22:22:24 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 196, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 272, in shutdown
+    sys.exit(0)
+SystemExit: 0
+26.11.2025 22:22:26 [DEBUG] HW revision: A
+26.11.2025 22:22:26 [DEBUG] Static COM port: COM3
+26.11.2025 22:22:26 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+26.11.2025 22:37:56 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 22:37:56 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 22:39:37 [DEBUG] HW revision: A
+26.11.2025 22:39:37 [DEBUG] Static COM port: COM3
+26.11.2025 22:39:37 [ERROR] Cannot open COM port COM3: could not open port 'COM3': PermissionError(13, 'Odmowa dostêpu.', None, 5)
+26.11.2025 22:40:06 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 22:40:06 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 22:41:21 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 196, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 272, in shutdown
+SystemExit: 0
+26.11.2025 22:46:58 [DEBUG] HW revision: A
+26.11.2025 22:46:58 [DEBUG] Static COM port: COM3
+26.11.2025 22:46:58 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+26.11.2025 22:47:05 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 22:47:05 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 22:47:12 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 22:47:12 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 22:56:25 [DEBUG] HW revision: A
+26.11.2025 22:56:25 [DEBUG] Static COM port: COM3
+26.11.2025 22:56:25 [ERROR] Cannot open COM port COM3: could not open port 'COM3': PermissionError(13, 'Odmowa dostêpu.', None, 5)
+26.11.2025 22:56:31 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 196, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 291, in shutdown
+    sys.exit(0)
+SystemExit: 0
+26.11.2025 22:56:36 [DEBUG] HW revision: A
+26.11.2025 22:56:36 [DEBUG] Static COM port: COM3
+26.11.2025 22:56:36 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+26.11.2025 22:56:49 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 22:56:49 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:01:51 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:01:51 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:06:09 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:06:09 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:20:03 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 196, in exit_app
+    print("[tray] Double click - switch to default folder")
+    ^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 291, in shutdown
+SystemExit: 0
+26.11.2025 23:20:08 [DEBUG] HW revision: A
+26.11.2025 23:20:08 [DEBUG] Static COM port: COM3
+26.11.2025 23:20:08 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+26.11.2025 23:22:25 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:22:25 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:22:31 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 210, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 305, in shutdown
+    def signal_handler(self, signum, frame):
+        ^^^^^^^^^^^
+SystemExit: 0
+26.11.2025 23:23:09 [DEBUG] HW revision: A
+26.11.2025 23:23:09 [DEBUG] Static COM port: COM3
+26.11.2025 23:23:09 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+26.11.2025 23:24:50 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:24:50 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:25:02 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 210, in exit_app
+    self.shutdown()
+  File "D:\Github\PhotoFrame-Clean\main.py", line 303, in shutdown
+SystemExit: 0
+26.11.2025 23:29:50 [DEBUG] HW revision: A
+26.11.2025 23:29:50 [DEBUG] Static COM port: COM3
+26.11.2025 23:29:50 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+26.11.2025 23:31:06 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:31:06 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:31:43 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:31:43 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:32:10 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:32:10 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:32:29 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 270, in exit_app
+    sys.exit(0)
+SystemExit: 0
+26.11.2025 23:32:48 [DEBUG] HW revision: A
+26.11.2025 23:32:48 [DEBUG] Static COM port: COM3
+26.11.2025 23:32:48 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+26.11.2025 23:32:55 [ERROR] An error occurred when calling message handler
+Traceback (most recent call last):
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 412, in _dispatcher
+    return int(icon._message_handlers.get(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_win32.py", line 224, in _on_notify
+    descriptors[index - 1](self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 328, in inner
+    callback(self)
+  File "C:\Users\danie\AppData\Local\Programs\Python\Python311\Lib\site-packages\pystray\_base.py", line 453, in __call__
+    return self._action(icon, self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\PhotoFrame-Clean\main.py", line 270, in exit_app
+    sys.exit(0)
+SystemExit: 0
+26.11.2025 23:33:33 [DEBUG] HW revision: A
+26.11.2025 23:33:33 [DEBUG] Static COM port: COM3
+26.11.2025 23:33:33 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+26.11.2025 23:34:29 [DEBUG] HW revision: A
+26.11.2025 23:34:29 [DEBUG] Static COM port: COM3
+26.11.2025 23:34:29 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+26.11.2025 23:37:23 [DEBUG] HW revision: A
+26.11.2025 23:37:23 [DEBUG] Static COM port: COM3
+26.11.2025 23:37:23 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+26.11.2025 23:37:37 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:37:37 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:37:43 [DEBUG] HW revision: A
+26.11.2025 23:37:43 [DEBUG] Static COM port: COM3
+26.11.2025 23:37:43 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+26.11.2025 23:40:22 [DEBUG] HW revision: A
+26.11.2025 23:40:22 [DEBUG] Static COM port: COM3
+26.11.2025 23:40:22 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+26.11.2025 23:41:45 [DEBUG] HW revision: A
+26.11.2025 23:41:45 [DEBUG] Static COM port: COM3
+26.11.2025 23:41:45 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+26.11.2025 23:42:10 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:42:10 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:42:28 [DEBUG] Bitmap temp_black.png is now loaded in the cache
+26.11.2025 23:45:10 [DEBUG] HW revision: A
+26.11.2025 23:45:10 [DEBUG] Static COM port: COM3
+26.11.2025 23:45:10 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+26.11.2025 23:45:35 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:45:35 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:45:45 [DEBUG] Bitmap temp_black.png is now loaded in the cache
+26.11.2025 23:46:43 [DEBUG] HW revision: A
+26.11.2025 23:46:43 [DEBUG] Static COM port: COM3
+26.11.2025 23:46:43 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+26.11.2025 23:46:56 [WARNING] (Write line) Too fast! Slow down!
+26.11.2025 23:46:56 [WARNING] (Write line) Too fast! Slow down!

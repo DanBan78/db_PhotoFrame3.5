@@ -10,6 +10,29 @@ import threading
 from pathlib import Path
 import yaml
 
+# Debug configuration
+DEBUG_ENABLED = True
+
+def load_debug_config():
+    """Load debug settings from config file"""
+    global DEBUG_ENABLED
+    try:
+        config_path = Path(__file__).parent.parent / "tools" / "config.yaml"
+        if config_path.exists():
+            with config_path.open("r", encoding="utf-8") as f:
+                config = yaml.safe_load(f) or {}
+                debug_config = config.get('debug', {})
+                DEBUG_ENABLED = debug_config.get('enabled', True)
+    except Exception:
+        pass
+
+def debug_print(message, level='info'):
+    """Print debug message if debug is enabled"""
+    if DEBUG_ENABLED and level in ['info', 'debug', 'error']:
+        print(message)
+
+load_debug_config()
+
 class PhotoFrame:
     def __init__(self, config_path="tools/config.yaml"):
         # Load initial configuration from disk
@@ -30,7 +53,7 @@ class PhotoFrame:
             with open(config_path, 'r', encoding='utf-8') as f:
                 return yaml.safe_load(f)
         except Exception as e:
-            print(f"Error loading config: {e}")
+            debug_print(f"Error loading config: {e}", 'error')
             return self.get_default_config()
     
     def get_default_config(self):
@@ -60,14 +83,14 @@ class PhotoFrame:
                     # best-effort: ignore if display doesn't accept attribute
                     pass
         except Exception as e:
-            print(f"Error setting display config in set_display: {e}")
+            debug_print(f"Error setting display config in set_display: {e}", 'error')
 
     def reload_config(self, config_path="tools/config.yaml"):
         """Reload configuration from disk and apply to display/slideshow."""
-        print("Reloading configuration...")
+        debug_print("Reloading configuration...")
         new_cfg = self.load_config(config_path)
         if not new_cfg:
-            print("Failed to reload config; keeping previous settings")
+            debug_print("Failed to reload config; keeping previous settings", 'error')
             return False
         self.config = new_cfg
         # Apply to display if available
@@ -75,7 +98,7 @@ class PhotoFrame:
             if self.display and hasattr(self.display, 'apply_config'):
                 self.display.apply_config(self.config)
         except Exception as e:
-            print(f"Error applying config to display: {e}")
+            debug_print(f"Error applying config to display: {e}", 'error')
 
         # Reload image list according to new photos.orientation
         if self.running:
@@ -84,7 +107,7 @@ class PhotoFrame:
             # Immediately show first image from new orientation
             self.show_current_image_now()
 
-        print("Configuration reloaded")
+        debug_print("Configuration reloaded")
         return True
         
     def load_images(self):
@@ -110,11 +133,11 @@ class PhotoFrame:
         self.config = fresh_cfg
         
         if not folder:
-            print("No image folder configured (portrait_folder/landscape_folder missing)")
+            debug_print("No image folder configured (portrait_folder/landscape_folder missing)", 'error')
             return []
 
         if not os.path.exists(folder):
-            print(f"Image folder not found: {folder}")
+            debug_print(f"Image folder not found: {folder}", 'error')
             return []
         
         # Find all image files
@@ -128,13 +151,13 @@ class PhotoFrame:
         # Shuffle for random order
         random.shuffle(images)
 
-        print(f"Loaded {len(images)} images from {folder} (orientation={orientation})")
+        debug_print(f"Loaded {len(images)} images from {folder} (orientation={orientation})")
         return images
     
     def start_slideshow(self):
         """Start the slideshow"""
         if not self.display:
-            print("Display not initialized")
+            debug_print("Display not initialized", 'error')
             return False
         # Reload configuration before starting slideshow to pick up any recent changes
         try:
@@ -144,7 +167,7 @@ class PhotoFrame:
 
         self.current_images = self.load_images()
         if not self.current_images:
-            print("No images found")
+            debug_print("No images found", 'error')
             return False
         
         self.running = True
@@ -154,7 +177,7 @@ class PhotoFrame:
         self.slideshow_thread = threading.Thread(target=self._slideshow_loop, daemon=True)
         self.slideshow_thread.start()
         
-        print(f"Photo frame slideshow started with {len(self.current_images)} images")
+        debug_print(f"Photo frame slideshow started with {len(self.current_images)} images")
         return True
     
     def _slideshow_loop(self):
@@ -176,7 +199,7 @@ class PhotoFrame:
                         try:
                             self.display.apply_config(self.config)
                         except Exception as e:
-                            print(f"Error applying config to display in loop: {e}")
+                            debug_print(f"Error applying config to display in loop: {e}", 'error')
                     # After applying config, refresh the image list so that
                     # orientation/folder changes take effect immediately.
                     try:
@@ -185,12 +208,12 @@ class PhotoFrame:
                             self.current_images = new_images
                             self.current_index = 0
                     except Exception as e:
-                        print(f"Error reloading image list after config change: {e}")
+                        debug_print(f"Error reloading image list after config change: {e}", 'error')
             except Exception as e:
-                print(f"Error reloading config before display: {e}")
+                debug_print(f"Error reloading config before display: {e}", 'error')
 
             # Display with overlay
-            print(f"Displaying: {os.path.basename(image_path)}")
+            debug_print(f"Displaying: {os.path.basename(image_path)}")
             success = False
             try:
                 success = self.display.display_image_with_overlay(
@@ -199,10 +222,10 @@ class PhotoFrame:
                     show_date=self.config.get('overlay', {}).get('show_date', True)
                 )
             except Exception as e:
-                print(f"Error during display_image_with_overlay: {e}")
+                debug_print(f"Error during display_image_with_overlay: {e}", 'error')
             
             if not success:
-                print(f"Failed to display {image_path}")
+                debug_print(f"Failed to display {image_path}", 'error')
             
             # Move to next image
             self.current_index = (self.current_index + 1) % len(self.current_images)
@@ -215,14 +238,14 @@ class PhotoFrame:
         self.running = False
         if self.slideshow_thread:
             self.slideshow_thread.join(timeout=1)
-        print("Slideshow stopped")
+        debug_print("Slideshow stopped")
     
     def next_image(self):
         """Skip to next image"""
-        print(f"next_image called: images={len(self.current_images) if self.current_images else 0}, running={self.running}")
+        debug_print(f"next_image called: images={len(self.current_images) if self.current_images else 0}, running={self.running}")
         if self.current_images and self.running:
             self.current_index = (self.current_index + 1) % len(self.current_images)
-            print(f"next_image: moved to index {self.current_index}")
+            debug_print(f"next_image: moved to index {self.current_index}")
     
     def show_current_image_now(self):
         """Immediately display current image (for config changes)"""
@@ -230,7 +253,7 @@ class PhotoFrame:
             return
         
         image_path = self.current_images[self.current_index]
-        print(f"Displaying: {os.path.basename(image_path)}")
+        debug_print(f"Displaying: {os.path.basename(image_path)}")
         try:
             self.display.display_image_with_overlay(
                 image_path,
@@ -238,7 +261,7 @@ class PhotoFrame:
                 show_date=self.config.get('overlay', {}).get('show_date', True)
             )
         except Exception as e:
-            print(f"Error during immediate display: {e}")
+            debug_print(f"Error during immediate display: {e}", 'error')
     
     def previous_image(self):
         """Go to previous image"""
@@ -257,7 +280,7 @@ class PhotoFrame:
             with open(self.config_path, 'w', encoding='utf-8') as f:
                 yaml.safe_dump(self.config, f, sort_keys=False)
         except Exception as e:
-            print(f"Error saving orientation to config: {e}")
+            debug_print(f"Error saving orientation to config: {e}", 'error')
         
         # Apply config to display
         try:
@@ -272,4 +295,4 @@ class PhotoFrame:
             self.current_index = 0
             self.show_current_image_now()
             
-        print(f"Switched to {new_orientation} orientation")
+        debug_print(f"Switched to {new_orientation} orientation")

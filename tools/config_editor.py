@@ -22,6 +22,29 @@ from tkinter import ttk, filedialog, messagebox
 import yaml
 from pathlib import Path
 
+# Debug configuration
+DEBUG_ENABLED = True
+
+def load_debug_config():
+    """Load debug settings from config file"""
+    global DEBUG_ENABLED
+    try:
+        config_path = Path(__file__).parent / "config.yaml"
+        if config_path.exists():
+            with config_path.open("r", encoding="utf-8") as f:
+                config = yaml.safe_load(f) or {}
+                debug_config = config.get('debug', {})
+                DEBUG_ENABLED = debug_config.get('enabled', True)
+    except Exception:
+        pass
+
+def debug_print(message, level='info'):
+    """Print debug message if debug is enabled"""
+    if DEBUG_ENABLED and level in ['info', 'debug', 'error']:
+        print(message)
+
+load_debug_config()
+
 MAIN_DIR = Path(__file__).resolve().parents[1]
 TOOLS_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = TOOLS_DIR / "config.yaml"
@@ -59,26 +82,38 @@ class ConfigEditor:
     def __init__(self):
         self.window = tk.Tk()
         self.window.title("Photo Frame Configuration")
-        self.window.geometry("560x360")
+        self.window.geometry("700x300")
         self.window.resizable(False, False)
+
+        # Load history first
+        self.portrait_history = load_history(PORTRAIT_HISTORY)
+        self.landscape_history = load_history(LANDSCAPE_HISTORY)
 
         # Widgets
         y = 10
-        ttk.Label(self.window, text="Photo Frame Configuration", font=(None, 12, "bold")).place(x=10, y=y)
+        ttk.Label(self.window, text="Photo Frame Configuration", font=("Arial", 12, "bold")).place(x=10, y=y)
 
         y += 30
         ttk.Label(self.window, text="Portrait photos").place(x=10, y=y)
-        self.portrait_entry = ttk.Entry(self.window)
-        self.portrait_entry.place(x=140, y=y, width=360)
+        self.portrait_dropdown_var = tk.StringVar()
+        self.portrait_dropdown = ttk.Combobox(self.window, textvariable=self.portrait_dropdown_var, values=self.portrait_history, state="readonly")
+        self.portrait_dropdown.place(x=140, y=y, width=420)
         self.portrait_btn = ttk.Button(self.window, text="...", width=3, command=self.browse_portrait)
-        self.portrait_btn.place(x=510, y=y)
+        self.portrait_btn.place(x=570, y=y)
+        # Button to set portrait as default
+        self.portrait_set_btn = ttk.Button(self.window, text="SET", width=5, command=self.set_portrait_as_default)
+        self.portrait_set_btn.place(x=610, y=y)
 
         y += 36
         ttk.Label(self.window, text="Landscape photos").place(x=10, y=y)
-        self.landscape_entry = ttk.Entry(self.window)
-        self.landscape_entry.place(x=140, y=y, width=360)
+        self.landscape_dropdown_var = tk.StringVar()
+        self.landscape_dropdown = ttk.Combobox(self.window, textvariable=self.landscape_dropdown_var, values=self.landscape_history, state="readonly")
+        self.landscape_dropdown.place(x=140, y=y, width=420)
         self.landscape_btn = ttk.Button(self.window, text="...", width=3, command=self.browse_landscape)
-        self.landscape_btn.place(x=510, y=y)
+        self.landscape_btn.place(x=570, y=y)
+        # Button to set landscape as default
+        self.landscape_set_btn = ttk.Button(self.window, text="SET", width=5, command=self.set_landscape_as_default)
+        self.landscape_set_btn.place(x=610, y=y)
 
         y += 36
         ttk.Label(self.window, text="Frame orientation").place(x=10, y=y)
@@ -102,10 +137,10 @@ class ConfigEditor:
         # Replace spinbox with a slider from 5 to 300 seconds
         self.interval_var = tk.IntVar(value=10)
         self.interval_scale = ttk.Scale(self.window, from_=5, to=300, orient='horizontal', command=lambda v: self.interval_var.set(int(float(v))))
-        self.interval_scale.place(x=200, y=y, width=260)
+        self.interval_scale.place(x=140, y=y, width=520)
         # Show current value label
         self.interval_value_label = ttk.Label(self.window, textvariable=self.interval_var)
-        self.interval_value_label.place(x=470, y=y)
+        self.interval_value_label.place(x=670, y=y)
 
         y += 36
         self.random_var = tk.BooleanVar()
@@ -116,32 +151,82 @@ class ConfigEditor:
         self.aspect_check.place(x=180, y=y)
 
         # Buttons
+        y += 25
         self.save_btn = ttk.Button(self.window, text="Save", command=self.on_save_run)
-        self.save_btn.place(x=120, y=300, width=140, height=40)
+        self.save_btn.place(x=120, y=y, width=140, height=40)
         self.exit_btn = ttk.Button(self.window, text="Exit App", command=self.on_exit)
-        self.exit_btn.place(x=300, y=300, width=140, height=40)
+        self.exit_btn.place(x=300, y=y, width=140, height=40)
 
-        # Load config and histories
-        self.portrait_history = load_history(PORTRAIT_HISTORY)
-        self.landscape_history = load_history(LANDSCAPE_HISTORY)
         self.load_config()
+        # Removed default folders loading
 
         # Bind right-click on browse buttons to show history
         self.portrait_btn.bind("<Button-3>", lambda e: self.show_portrait_history_menu(e))
         self.landscape_btn.bind("<Button-3>", lambda e: self.show_landscape_history_menu(e))
+        
 
+
+    def set_portrait_as_default(self):
+        """Set current portrait folder as default (move to first position in history)"""
+        folder = self.portrait_dropdown_var.get()
+        if folder:
+            # Remove from current position if exists
+            if folder in self.portrait_history:
+                self.portrait_history.remove(folder)
+            # Insert at beginning
+            self.portrait_history.insert(0, folder)
+            # Update dropdown values
+            self.portrait_dropdown.configure(values=self.portrait_history)
+            save_history(PORTRAIT_HISTORY, self.portrait_history)
+            # Update dropdown to show first item (default)
+            self.portrait_dropdown_var.set(self.portrait_history[0])
+            print(f"Set as default portrait: {folder}")
+    
+    def set_landscape_as_default(self):
+        """Set current landscape folder as default (move to first position in history)"""
+        folder = self.landscape_dropdown_var.get()
+        if folder:
+            # Remove from current position if exists
+            if folder in self.landscape_history:
+                self.landscape_history.remove(folder)
+            # Insert at beginning
+            self.landscape_history.insert(0, folder)
+            # Update dropdown values
+            self.landscape_dropdown.configure(values=self.landscape_history)
+            save_history(LANDSCAPE_HISTORY, self.landscape_history)
+            # Update dropdown to show first item (default)
+            self.landscape_dropdown_var.set(self.landscape_history[0])
+            print(f"Set as default landscape: {folder}")
+
+    
     def load_config(self):
         if CONFIG_PATH.exists():
             try:
                 with CONFIG_PATH.open("r", encoding="utf-8") as f:
                     data = yaml.safe_load(f) or {}
                 cfg = data.get('config', {})
-                self.portrait_entry.delete(0, tk.END)
-                self.portrait_entry.insert(0, cfg.get('PHOTO_FRAME_FOLDER_PORTRAIT', cfg.get('PHOTO_FRAME_FOLDER', '')))
-                self.landscape_entry.delete(0, tk.END)
-                self.landscape_entry.insert(0, cfg.get('PHOTO_FRAME_FOLDER_LANDSCAPE', cfg.get('PHOTO_FRAME_FOLDER', '')))
+                # Use line numbers from config to get correct folders from history
+                portrait_line = cfg.get('PORTRAIT_HISTORY_LINE', 0)
+                landscape_line = cfg.get('LANDSCAPE_HISTORY_LINE', 0)
+                
+                # Get folder based on line number, fallback to first or config value
+                if self.portrait_history and portrait_line < len(self.portrait_history):
+                    portrait_folder = self.portrait_history[portrait_line]
+                else:
+                    portrait_folder = self.portrait_history[0] if self.portrait_history else cfg.get('PHOTO_FRAME_FOLDER_PORTRAIT', cfg.get('PHOTO_FRAME_FOLDER', ''))
+                    
+                if self.landscape_history and landscape_line < len(self.landscape_history):
+                    landscape_folder = self.landscape_history[landscape_line]
+                else:
+                    landscape_folder = self.landscape_history[0] if self.landscape_history else cfg.get('PHOTO_FRAME_FOLDER_LANDSCAPE', cfg.get('PHOTO_FRAME_FOLDER', ''))
+                    
+                self.portrait_dropdown_var.set(portrait_folder)
+                self.landscape_dropdown_var.set(landscape_folder)
+                
+
                 # Orientation: set toggle text accordingly
-                orientation_val = cfg.get('PHOTO_FRAME_ORIENTATION', cfg.get('orientation', 'Portrait'))
+                photos = data.get('photos', {})
+                orientation_val = photos.get('orientation', 'Portrait')
                 orientation_val = str(orientation_val).capitalize()
                 self.orientation_var.set(orientation_val)
                 try:
@@ -197,32 +282,34 @@ class ConfigEditor:
             menu.grab_release()
 
     def browse_portrait(self):
-        folder = filedialog.askdirectory(initialdir=self.portrait_entry.get() or os.path.expanduser("~"))
+        current = self.portrait_dropdown_var.get()
+        folder = filedialog.askdirectory(initialdir=current or os.path.expanduser("~"))
         if folder:
             self.select_portrait(folder)
 
     def browse_landscape(self):
-        folder = filedialog.askdirectory(initialdir=self.landscape_entry.get() or os.path.expanduser("~"))
+        current = self.landscape_dropdown_var.get()
+        folder = filedialog.askdirectory(initialdir=current or os.path.expanduser("~"))
         if folder:
             self.select_landscape(folder)
 
     def select_portrait(self, folder):
         if folder and os.path.exists(folder):
-            self.portrait_entry.delete(0, tk.END)
-            self.portrait_entry.insert(0, folder)
+            self.portrait_dropdown_var.set(folder)
             # update history
             if folder in self.portrait_history:
                 self.portrait_history.remove(folder)
             self.portrait_history.append(folder)
+            self.portrait_dropdown.configure(values=self.portrait_history)
             save_history(PORTRAIT_HISTORY, self.portrait_history)
 
     def select_landscape(self, folder):
         if folder and os.path.exists(folder):
-            self.landscape_entry.delete(0, tk.END)
-            self.landscape_entry.insert(0, folder)
+            self.landscape_dropdown_var.set(folder)
             if folder in self.landscape_history:
                 self.landscape_history.remove(folder)
             self.landscape_history.append(folder)
+            self.landscape_dropdown.configure(values=self.landscape_history)
             save_history(LANDSCAPE_HISTORY, self.landscape_history)
 
     def on_save_run(self):
@@ -245,8 +332,26 @@ class ConfigEditor:
         cfg['config']['PHOTO_FRAME_INVERSE'] = bool(self.rotate_var.get())
 
         # Save photos section used by PhotoFrame
-        cfg['photos']['portrait_folder'] = self.portrait_entry.get()
-        cfg['photos']['landscape_folder'] = self.landscape_entry.get()
+        portrait_folder = self.portrait_dropdown_var.get()
+        landscape_folder = self.landscape_dropdown_var.get()
+        cfg['photos']['portrait_folder'] = portrait_folder
+        cfg['photos']['landscape_folder'] = landscape_folder
+        
+        # Save line numbers of selected folders in history
+        try:
+            portrait_line = self.portrait_history.index(portrait_folder) if portrait_folder in self.portrait_history else 0
+        except (ValueError, AttributeError):
+            portrait_line = 0
+            
+        try:
+            landscape_line = self.landscape_history.index(landscape_folder) if landscape_folder in self.landscape_history else 0
+        except (ValueError, AttributeError):
+            landscape_line = 0
+            
+        cfg['config']['PORTRAIT_HISTORY_LINE'] = portrait_line
+        cfg['config']['LANDSCAPE_HISTORY_LINE'] = landscape_line
+        
+
         cfg['photos']['orientation'] = self.orientation_var.get().lower()
         # no per-angle setting saved
         try:
@@ -255,8 +360,8 @@ class ConfigEditor:
             cfg['photos']['slideshow_interval'] = 10
 
         # Keep backwards-compatible config keys too
-        cfg['config']['PHOTO_FRAME_FOLDER_PORTRAIT'] = self.portrait_entry.get()
-        cfg['config']['PHOTO_FRAME_FOLDER_LANDSCAPE'] = self.landscape_entry.get()
+        cfg['config']['PHOTO_FRAME_FOLDER_PORTRAIT'] = portrait_folder
+        cfg['config']['PHOTO_FRAME_FOLDER_LANDSCAPE'] = landscape_folder
         cfg['config']['PHOTO_FRAME_ORIENTATION'] = self.orientation_var.get()
         cfg['config']['PHOTO_FRAME_INTERVAL'] = cfg['photos']['slideshow_interval']
         cfg['config']['PHOTO_FRAME_RANDOM'] = bool(self.random_var.get())
@@ -265,12 +370,12 @@ class ConfigEditor:
         try:
             with CONFIG_PATH.open("w", encoding="utf-8") as f:
                 yaml.safe_dump(cfg, f, sort_keys=False)
+            debug_print("⚙️ Configuration saved successfully")
         except Exception as e:
             messagebox.showerror("Error", f"Could not save config.yaml: {e}")
             return
 
-        # Do not launch the application; only save config and close the editor.
-        # The running application is expected to reload config or be restarted separately.
+        # Close the editor after saving
         self.window.destroy()
 
     def on_exit(self):

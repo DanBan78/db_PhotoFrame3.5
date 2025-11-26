@@ -186,7 +186,7 @@ class LcdCommRevA(LcdComm):
 
         # Debug: show incoming image and requested sizes
         try:
-            print(f"LcdCommRevA.DisplayPILImage: incoming image.size={image.size}, image.mode={image.mode}, requested ({image_width},{image_height}), target display ({width}x{height})")
+            debug_print(f"LcdCommRevA.DisplayPILImage: incoming image.size={image.size}, image.mode={image.mode}, requested ({image_width},{image_height}), target display ({width}x{height})")
         except Exception:
             pass
 
@@ -204,7 +204,7 @@ class LcdCommRevA(LcdComm):
             image_height = height - y
 
         if image_width != image.size[0] or image_height != image.size[1]:
-            print(f"LcdCommRevA.DisplayPILImage: cropping image from {image.size} to ({image_width},{image_height})")
+            debug_print(f"LcdCommRevA.DisplayPILImage: cropping image from {image.size} to ({image_width},{image_height})")
             image = image.crop((0, 0, image_width, image_height))
 
         assert x <= width, 'Image X coordinate must be <= display width'

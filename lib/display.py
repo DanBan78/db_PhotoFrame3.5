@@ -4,11 +4,34 @@ Clean implementation without system monitor dependencies
 """
 
 import os
-import sys
 import time
 import yaml
+from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
-from lib.lcd import lcd_comm_rev_a, serialize
+from lib.lcd import lcd_comm_rev_a
+
+# Debug configuration
+DEBUG_ENABLED = True
+
+def load_debug_config():
+    """Load debug settings from config file"""
+    global DEBUG_ENABLED
+    try:
+        config_path = Path(__file__).parent.parent / "tools" / "config.yaml"
+        if config_path.exists():
+            with config_path.open("r", encoding="utf-8") as f:
+                config = yaml.safe_load(f) or {}
+                debug_config = config.get('debug', {})
+                DEBUG_ENABLED = debug_config.get('enabled', True)
+    except Exception:
+        pass
+
+def debug_print(message, level='info'):
+    """Print debug message if debug is enabled"""
+    if DEBUG_ENABLED and level in ['info', 'debug', 'error']:
+        print(message)
+
+load_debug_config()
 
 class LCDDisplay:
     def __init__(self, serial_port="COM3", brightness=85):
@@ -32,9 +55,9 @@ class LCDDisplay:
                 try:
                     with open(cfg_path, 'r', encoding='utf-8') as f:
                         cfg = yaml.safe_load(f) or {}
-                    print(f"Loaded config from: {cfg_path}")
+                    debug_print(f"Loaded config from: {cfg_path}")
                 except Exception as e:
-                    print(f"Failed to load config '{cfg_path}': {e}")
+                    debug_print(f"Failed to load config '{cfg_path}': {e}", 'error')
                     cfg = {}
             else:
                 cfg = {}
@@ -58,12 +81,12 @@ class LCDDisplay:
         else:
             self.width, self.height = 480, 320
         # Debug info
-        print(f"Display init => frame_orientation={self.frame_orientation}, inverse={self.inverse}, target={self.width}x{self.height}")
+        debug_print(f"Display init => frame_orientation={self.frame_orientation}, inverse={self.inverse}, target={self.width}x{self.height}")
         
     def initialize(self):
         """Initialize LCD connection"""
         try:
-            print(f"Connecting to LCD on {self.serial_port}...")
+            debug_print(f"Connecting to LCD on {self.serial_port}...")
             # Create rev A comm object and run its initialization handshake
             self.lcd = lcd_comm_rev_a.LcdCommRevA(self.serial_port)
             # Use the library's initialization method
@@ -77,16 +100,16 @@ class LCDDisplay:
                 self.lcd.SetBrightness(self.brightness)
             except Exception:
                 pass
-            print("LCD initialized successfully")
+            debug_print("LCD initialized successfully")
             return True
         except Exception as e:
-            print(f"Failed to initialize LCD: {e}")
+            debug_print(f"Failed to initialize LCD: {e}", 'error')
             return False
     
     def display_image(self, image_path):
         """Display image on LCD screen"""
         if not self.lcd:
-            print("LCD not initialized")
+            debug_print("LCD not initialized", 'error')
             return False
             
         try:
@@ -101,7 +124,7 @@ class LCDDisplay:
                 except Exception:
                     lcd_w, lcd_h = self.width, self.height
                 if image.size != (lcd_w, lcd_h):
-                    print(f"display_image: resizing image from {image.size} to LCD target {(lcd_w,lcd_h)} before send")
+                    debug_print(f"display_image: resizing image from {image.size} to LCD target {(lcd_w,lcd_h)} before send")
                     image = image.resize((lcd_w, lcd_h), Image.Resampling.LANCZOS)
                 self.lcd.DisplayPILImage(image, 0, 0, image.size[0], image.size[1])
             except Exception:
@@ -117,7 +140,7 @@ class LCDDisplay:
                         pass
             return True
         except Exception as e:
-            print(f"Error displaying image {image_path}: {e}")
+            debug_print(f"Error displaying image {image_path}: {e}", 'error')
             return False
     
     def display_image_with_overlay(self, image_path, show_time=True, show_date=True):
@@ -136,7 +159,7 @@ class LCDDisplay:
                 except Exception:
                     lcd_w, lcd_h = self.width, self.height
                 if image.size != (lcd_w, lcd_h):
-                    print(f"display_image_with_overlay: resizing image from {image.size} to LCD target {(lcd_w,lcd_h)} before overlay")
+                    debug_print(f"display_image_with_overlay: resizing image from {image.size} to LCD target {(lcd_w,lcd_h)} before overlay")
                     image = image.resize((lcd_w, lcd_h), Image.Resampling.LANCZOS)
             except Exception:
                 pass
@@ -264,17 +287,17 @@ class LCDDisplay:
                     composed = Image.alpha_composite(base_img, overlay_layer)
                     image = composed.convert('RGB')
                 except Exception as e:
-                    print(f"display_image_with_overlay: compositing overlay failed: {e}")
+                    debug_print(f"display_image_with_overlay: compositing overlay failed: {e}", 'error')
             
             # Display on LCD using DisplayPILImage
             try:
-                print(f"display_image_with_overlay: final image size before send {image.size}, mode={image.mode}")
+                debug_print(f"display_image_with_overlay: final image size before send {image.size}, mode={image.mode}")
                 try:
                     lcd_w, lcd_h = self.lcd.get_width(), self.lcd.get_height()
                 except Exception:
                     lcd_w, lcd_h = self.width, self.height
                 if image.size != (lcd_w, lcd_h):
-                    print(f"display_image_with_overlay: resizing image from {image.size} to LCD target {(lcd_w,lcd_h)} before send")
+                    debug_print(f"display_image_with_overlay: resizing image from {image.size} to LCD target {(lcd_w,lcd_h)} before send")
                     image = image.resize((lcd_w, lcd_h), Image.Resampling.LANCZOS)
                 self.lcd.DisplayPILImage(image, 0, 0, image.size[0], image.size[1])
             except Exception:
@@ -282,7 +305,7 @@ class LCDDisplay:
                 temp_path = f"temp_display_{int(time.time())}.png"
                 image.save(temp_path)
                 try:
-                    print("display_image_with_overlay: DisplayPILImage failed, using DisplayBitmap fallback")
+                    debug_print("display_image_with_overlay: DisplayPILImage failed, using DisplayBitmap fallback")
                     self.lcd.DisplayBitmap(str(temp_path), 0, 0)
                 finally:
                     try:
@@ -292,7 +315,7 @@ class LCDDisplay:
                 
             return True
         except Exception as e:
-            print(f"Error displaying image with overlay: {e}")
+            debug_print(f"Error displaying image with overlay: {e}", 'error')
             return False
     
     def clear_screen(self):
@@ -331,9 +354,9 @@ class LCDDisplay:
                 self.width, self.height = 320, 480
             else:
                 self.width, self.height = 480, 320
-            print(f"LCDDisplay.apply_config => frame_orientation={self.frame_orientation}, inverse={self.inverse}, target={self.width}x{self.height}")
+            debug_print(f"LCDDisplay.apply_config => frame_orientation={self.frame_orientation}, inverse={self.inverse}, target={self.width}x{self.height}")
         except Exception as e:
-            print(f"apply_config error: {e}")
+            debug_print(f"apply_config error: {e}", 'error')
 
     def _prepare_image_for_display(self, image: Image.Image) -> Image.Image:
         """Rotate and resize image according to configured frame orientation and inverse flag.
@@ -348,7 +371,7 @@ class LCDDisplay:
             img = image
             # Log source size before any transforms (rotation/resize)
             try:
-                print(f"_prepare_image_for_display: source size before transforms {img.size}")
+                debug_print(f"_prepare_image_for_display: source size before transforms {img.size}")
             except Exception:
                 pass
             # Determine target size explicitly
@@ -370,22 +393,22 @@ class LCDDisplay:
 
             if rotate_degrees:
                 try:
-                    print(f"_prepare_image_for_display: rotating {rotate_degrees}deg to match frame")
+                    debug_print(f"_prepare_image_for_display: rotating {rotate_degrees}deg to match frame")
                     img = img.rotate(rotate_degrees, expand=True)
                 except Exception as e:
-                    print(f"_prepare_image_for_display: rotation failed: {e}")
+                    debug_print(f"_prepare_image_for_display: rotation failed: {e}", 'error')
 
             # For Landscape mode we want the image scaled to full portrait target (320x480)
             # so that landscape-folder images appear the same as portrait ones.
             try:
                 if self.frame_orientation == 'Landscape':
-                    print(f"_prepare_image_for_display: force-resizing to {target_w}x{target_h} for landscape display")
+                    debug_print(f"_prepare_image_for_display: force-resizing to {target_w}x{target_h} for landscape display")
                     final = img.resize((target_w, target_h), Image.Resampling.LANCZOS)
                     # Apply 180deg flip if device is inverted (after composing)
                     if getattr(self, 'inverse', False):
-                        print("_prepare_image_for_display: applying 180deg inverse flip")
+                        debug_print("_prepare_image_for_display: applying 180deg inverse flip")
                         final = final.rotate(180)
-                    print(f"_prepare_image_for_display: final size {final.size}")
+                    debug_print(f"_prepare_image_for_display: final size {final.size}")
                     return final
 
                 # Fit image into target while preserving aspect ratio and center it (portrait/default)
@@ -393,7 +416,7 @@ class LCDDisplay:
                 scale = min(target_w / src_w, target_h / src_h)
                 new_w = max(1, int(src_w * scale))
                 new_h = max(1, int(src_h * scale))
-                print(f"_prepare_image_for_display: resizing from {src_w}x{src_h} to {new_w}x{new_h} (target {target_w}x{target_h})")
+                debug_print(f"_prepare_image_for_display: resizing from {src_w}x{src_h} to {new_w}x{new_h} (target {target_w}x{target_h})")
                 img_resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
 
                 # Create final canvas and paste centered
@@ -404,13 +427,13 @@ class LCDDisplay:
 
                 # Apply 180deg flip if device is inverted (after composing)
                 if getattr(self, 'inverse', False):
-                    print("_prepare_image_for_display: applying 180deg inverse flip")
+                    debug_print("_prepare_image_for_display: applying 180deg inverse flip")
                     final = final.rotate(180)
 
-                print(f"_prepare_image_for_display: final size {final.size}, pasted at ({offset_x},{offset_y})")
+                debug_print(f"_prepare_image_for_display: final size {final.size}, pasted at ({offset_x},{offset_y})")
                 return final
             except Exception as e:
-                print(f"_prepare_image_for_display: error during resize/compose: {e}")
+                debug_print(f"_prepare_image_for_display: error during resize/compose: {e}", 'error')
                 # Fallback: simple resize to target
                 try:
                     fallback = image.resize((target_w, target_h), Image.Resampling.LANCZOS)
@@ -440,6 +463,6 @@ class LCDDisplay:
                         self.lcd.close_serial()
                     except Exception:
                         pass
-                print("LCD connection closed")
+                debug_print("LCD connection closed")
             except:
                 pass
