@@ -249,76 +249,96 @@ class PhotoFrameApp:
             print(f"❌ Failed to refresh configuration editor: {e}")
 
     def switch_to_default_folder(self, icon=None, item=None):
-        """Set default folder (first from history) for current orientation"""
+        """Set default folder (first from history) for current orientation - ON CLICK SYSTRAY"""
         try:
             if not self.photoframe:
                 debug_print("No photoframe instance available")
                 return
-                
-            # Get current orientation from config
-            config = self.photoframe.load_config()
-            current_orientation = config.get('photos', {}).get('orientation', 'portrait').lower()
             
-            # Read appropriate history file - ALWAYS use first line (default)
-            if current_orientation.startswith('p'):  # portrait
-                history_file = Path("tools/portrait_folders_history.txt")
-            else:  # landscape
-                history_file = Path("tools/landscape_folders_history.txt")
-            
-            if not history_file.exists():
-                debug_print(f"History file not found: {history_file}")
-                return
-                
-            # Read first line (default folder)
-            with open(history_file, 'r', encoding='utf-8') as f:
-                lines = [line.strip() for line in f.readlines() if line.strip()]
-                
-            if not lines:
-                debug_print(f"No folders in history file: {history_file}")
-                return
-                
-            # ALWAYS use first folder from history (index 0)
-            default_folder = lines[0]
-            
-            if not os.path.exists(default_folder):
-                debug_print(f"Default folder does not exist: {default_folder}")
+            # Check if lock is active - if yes, exit
+            if self.photoframe._reload_lock:
+                print("⏱️ Reload already in progress, ignoring click")
                 return
             
-            debug_print(f"🔄 Setting default {current_orientation} folder: {default_folder}")
-            print(f"🔄 Switching to default folder: {default_folder}")
+            # Set lock to block slideshow loop
+            self.photoframe._reload_lock = True
+            print("🔒 Lock set - blocking slideshow loop")
             
-            # Update config with default folder
-            if current_orientation.startswith('p'):  # portrait
-                config['photos']['portrait_folder'] = default_folder
-                config['config']['PHOTO_FRAME_FOLDER_PORTRAIT'] = default_folder
-                config['config']['PORTRAIT_HISTORY_LINE'] = 0
-            else:  # landscape
-                config['photos']['landscape_folder'] = default_folder
-                config['config']['PHOTO_FRAME_FOLDER_LANDSCAPE'] = default_folder
-                config['config']['LANDSCAPE_HISTORY_LINE'] = 0
-            
-            # Save config
-            from lib.config_manager import config_manager
-            if config_manager.save_config(config):
-                print(f"✅ Config saved with default folder")
-            else:
-                print(f"❌ Failed to save config")
-                return
-            
-            # Update photoframe's in-memory config
-            self.photoframe.config = config
-            
-            # Reload images ONCE and show first image immediately
-            if self.photoframe.running:
-                self.photoframe.current_images = self.photoframe.load_images()
-                self.photoframe.current_index = 0
-                # Show the first image from new folder immediately
-                self.photoframe.show_current_image_now()
-                print(f"✅ Loaded {len(self.photoframe.current_images)} images from default folder")
+            try:
+                # Get current orientation from config
+                config = self.photoframe.load_config()
+                current_orientation = config.get('photos', {}).get('orientation', 'portrait').lower()
+                
+                # Read appropriate history file - ALWAYS use first line (default)
+                if current_orientation.startswith('p'):  # portrait
+                    history_file = Path("tools/portrait_folders_history.txt")
+                else:  # landscape
+                    history_file = Path("tools/landscape_folders_history.txt")
+                
+                if not history_file.exists():
+                    debug_print(f"History file not found: {history_file}")
+                    return
+                    
+                # Read first line (default folder)
+                with open(history_file, 'r', encoding='utf-8') as f:
+                    lines = [line.strip() for line in f.readlines() if line.strip()]
+                    
+                if not lines:
+                    debug_print(f"No folders in history file: {history_file}")
+                    return
+                    
+                # ALWAYS use first folder from history (index 0)
+                default_folder = lines[0]
+                
+                if not os.path.exists(default_folder):
+                    debug_print(f"Default folder does not exist: {default_folder}")
+                    return
+                
+                print(f"🔄 Setting default {current_orientation} folder: {default_folder}")
+                
+                # Update config with default folders from history (first paths)
+                if current_orientation.startswith('p'):  # portrait
+                    config['photos']['portrait_folder'] = default_folder
+                    config['config']['PHOTO_FRAME_FOLDER_PORTRAIT'] = default_folder
+                    config['config']['PORTRAIT_HISTORY_LINE'] = 0
+                else:  # landscape
+                    config['photos']['landscape_folder'] = default_folder
+                    config['config']['PHOTO_FRAME_FOLDER_LANDSCAPE'] = default_folder
+                    config['config']['LANDSCAPE_HISTORY_LINE'] = 0
+                
+                # Save config
+                from lib.config_manager import config_manager
+                if config_manager.save_config(config):
+                    print(f"✅ Config saved with default folder")
+                else:
+                    print(f"❌ Failed to save config")
+                    return
+                
+                # Update photoframe's in-memory config
+                self.photoframe.config = config
+                
+                # Reload images from location in config (use current config, already set above)
+                if self.photoframe.running:
+                    self.photoframe.current_images = self.photoframe.load_images(use_current_config=True)
+                    self.photoframe.current_index = 0
+                    # Load first image immediately
+                    self.photoframe.show_current_image_now()
+                    print(f"✅ Loaded {len(self.photoframe.current_images)} images from default folder")
+                    
+            finally:
+                # Release lock after 1 second
+                def release_lock():
+                    time.sleep(1.0)
+                    self.photoframe._reload_lock = False
+                    print("🔓 Lock released after 1 second")
+                
+                threading.Thread(target=release_lock, daemon=True).start()
             
         except Exception as e:
             debug_print(f"❌ Error switching to default folder: {e}", 'error')
             print(f"❌ Error: {e}")
+            # Ensure lock is released on error
+            self.photoframe._reload_lock = False
     
     def start_slideshow(self):
         """Start the photo slideshow"""

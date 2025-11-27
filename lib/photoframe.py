@@ -27,6 +27,7 @@ class PhotoFrame:
         self.current_images = []
         self.current_index = 0
         self.slideshow_thread = None
+        self._reload_lock = False  # Lock to prevent slideshow loop reload during manual operations
         
     def load_config(self):
         """Load configuration using config manager"""
@@ -70,7 +71,7 @@ class PhotoFrame:
 
         # Reload image list according to new photos.orientation
         if self.running:
-            self.current_images = self.load_images()
+            self.current_images = self.load_images(use_current_config=True)
             self.current_index = 0
             # Immediately show first image from new orientation
             self.show_current_image_now()
@@ -78,10 +79,18 @@ class PhotoFrame:
         debug_print("Configuration reloaded")
         return True
         
-    def load_images(self):
-        """Load images from configured folder"""
-        # Read fresh configuration from disk to ensure we use the latest values
-        fresh_cfg = config_manager.load_config(force_reload=True)
+    def load_images(self, use_current_config=False):
+        """Load images from configured folder
+        
+        Args:
+            use_current_config: If True, use self.config instead of reloading from disk
+        """
+        # Use current config or read fresh from disk
+        if use_current_config:
+            fresh_cfg = self.config
+        else:
+            fresh_cfg = config_manager.load_config(force_reload=True, silent=True)
+        
         photos_cfg = fresh_cfg.get('photos', {}) if isinstance(fresh_cfg, dict) else {}
         config_cfg = fresh_cfg.get('config', {}) if isinstance(fresh_cfg, dict) else {}
 
@@ -133,7 +142,8 @@ class PhotoFrame:
         except Exception:
             pass
 
-        self.current_images = self.load_images()
+        # Use current config (already loaded by reload_config above)
+        self.current_images = self.load_images(use_current_config=True)
         if not self.current_images:
             debug_print("No images found", 'error')
             return False
@@ -153,47 +163,51 @@ class PhotoFrame:
         while self.running:
             if not self.current_images:
                 break
-                
-            # Get current image
-            image_path = self.current_images[self.current_index]
             
-            # Before displaying, re-read configuration from disk and apply it
-            # to ensure we use the latest settings saved by the config editor.
+            # Skip this cycle if reload lock is active (manual operation in progress)
+            if self._reload_lock:
+                time.sleep(0.1)  # Small sleep to avoid busy loop
+                continue
+            
+            # Before displaying, check if configuration changed on disk
+            # Only reload if something actually changed to avoid spam
             try:
-                fresh_cfg = config_manager.load_config(force_reload=True)
+                fresh_cfg = config_manager.load_config(force_reload=True, silent=True)
                 if fresh_cfg:
-                    self.config = fresh_cfg
-                    if self.display and hasattr(self.display, 'apply_config'):
+                    # Check if relevant config changed (orientation or folders)
+                    config_changed = False
+                    if self.config.get('photos', {}).get('orientation') != fresh_cfg.get('photos', {}).get('orientation'):
+                        config_changed = True
+                    if self.config.get('photos', {}).get('portrait_folder') != fresh_cfg.get('photos', {}).get('portrait_folder'):
+                        config_changed = True
+                    if self.config.get('photos', {}).get('landscape_folder') != fresh_cfg.get('photos', {}).get('landscape_folder'):
+                        config_changed = True
+                    
+                    # Only if config changed, apply it and reload images
+                    if config_changed:
+                        debug_print("📋 Config changed detected - reloading images")
+                        self.config = fresh_cfg
+                        if self.display and hasattr(self.display, 'apply_config'):
+                            try:
+                                self.display.apply_config(self.config)
+                            except Exception as e:
+                                debug_print(f"Error applying config to display in loop: {e}", 'error')
+                        # Refresh the image list
                         try:
-                            self.display.apply_config(self.config)
+                            new_images = self.load_images(use_current_config=True)
+                            if new_images:
+                                self.current_images = new_images
+                                self.current_index = 0
                         except Exception as e:
-                            debug_print(f"Error applying config to display in loop: {e}", 'error')
-                    # After applying config, refresh the image list so that
-                    # orientation/folder changes take effect immediately.
-                    try:
-                        new_images = self.load_images()
-                        if new_images:
-                            self.current_images = new_images
-                            self.current_index = 0
-                    except Exception as e:
-                        debug_print(f"Error reloading image list after config change: {e}", 'error')
+                            debug_print(f"Error reloading image list after config change: {e}", 'error')
+                    # If nothing changed, just use fresh config silently without any logs
+                    else:
+                        self.config = fresh_cfg
             except Exception as e:
-                debug_print(f"Error reloading config before display: {e}", 'error')
+                debug_print(f"Error checking config in slideshow loop: {e}", 'error')
 
-            # Display with overlay
-            debug_print(f"Displaying: {os.path.basename(image_path)}")
-            success = False
-            try:
-                success = self.display.display_image_with_overlay(
-                    image_path,
-                    show_time=self.config.get('overlay', {}).get('show_time', True),
-                    show_date=self.config.get('overlay', {}).get('show_date', True)
-                )
-            except Exception as e:
-                debug_print(f"Error during display_image_with_overlay: {e}", 'error')
-            
-            if not success:
-                debug_print(f"Failed to display {image_path}", 'error')
+            # Display current image using show_current_image_now
+            self.show_current_image_now()
             
             # Move to next image
             self.current_index = (self.current_index + 1) % len(self.current_images)
@@ -224,10 +238,13 @@ class PhotoFrame:
         image_path = self.current_images[self.current_index]
         debug_print(f"Displaying: {os.path.basename(image_path)}")
         try:
+            # Get show_time from slideshow section (config editor saves it there)
+            show_time = self.config.get('slideshow', {}).get('show_time', True)
+            show_date = self.config.get('slideshow', {}).get('show_date', False)
             self.display.display_image_with_overlay(
                 image_path,
-                show_time=self.config.get('overlay', {}).get('show_time', True),
-                show_date=self.config.get('overlay', {}).get('show_date', True)
+                show_time=show_time,
+                show_date=show_date
             )
         except Exception as e:
             debug_print(f"Error during immediate display: {e}", 'error')
@@ -259,9 +276,9 @@ class PhotoFrame:
         except Exception as e:
             print(f"Error applying config to display: {e}")
         
-        # Reload images and show immediately
+        # Reload images and show immediately (use current config already set above)
         if self.running:
-            self.current_images = self.load_images()
+            self.current_images = self.load_images(use_current_config=True)
             self.current_index = 0
             self.show_current_image_now()
             

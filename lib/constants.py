@@ -28,9 +28,9 @@ TEMP_BLACK_IMAGE = "temp_black.png"
 
 # Font constants
 DEFAULT_FONT_PATH = "res/fonts/roboto/Roboto-Bold.ttf"
-MIN_FONT_SIZE = 16
-FONT_SIZE_MULTIPLIER = 0.04
-FONT_SIZE_BONUS = 11
+MIN_FONT_SIZE = 32  # Znacznie zwiększone dla lepszej czytelności
+FONT_SIZE_MULTIPLIER = 0.08  # Podwojone
+FONT_SIZE_BONUS = 24  # Znacznie zwiększone
 
 # Overlay constants
 MIN_OVERLAY_MARGIN = 8

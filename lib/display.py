@@ -129,15 +129,25 @@ class LCDDisplay:
             debug_print(f"Error displaying image {image_path}: {e}", 'error')
             return False
     
-    def _create_overlay_font(self, img_w, img_h):
+    def _create_overlay_font(self, img_w, img_h, is_landscape=True):
         """Create font for overlay text"""
+        # Użyj domyślnej czcionki systemowej PIL zamiast TTF
+        # PIL domyślna czcionka zawsze działa i ma stały rozmiar
+        base_font_size = 24 if is_landscape else 24  # Zmniejszone o połowę (było 60/80)
+        
+        # Zamiast TTF użyj prostej czcionki PIL
         try:
-            # Increase font size for better readability
-            base_font_size = max(MIN_FONT_SIZE, int(min(img_w, img_h) * FONT_SIZE_MULTIPLIER)) + FONT_SIZE_BONUS
-            return ImageFont.truetype(DEFAULT_FONT_PATH, base_font_size), base_font_size
-        except Exception:
-            # Default font does not accept size param; keep default
-            return ImageFont.load_default(), MIN_FONT_SIZE
+            # Spróbuj Arial Bold lub inną systemową
+            font_path = "C:\\Windows\\Fonts\\arialbd.ttf"  # Pogrubiona wersja
+            return ImageFont.truetype(font_path, base_font_size), base_font_size
+        except:
+            try:
+                # Fallback - Arial zwykły
+                font_path = "C:\\Windows\\Fonts\\arial.ttf"
+                return ImageFont.truetype(font_path, base_font_size), base_font_size
+            except:
+                # Ostateczny fallback
+                return ImageFont.load_default(), base_font_size
     
     def _prepare_overlay_texts(self, show_time, show_date):
         """Prepare text content for overlay"""
@@ -172,9 +182,10 @@ class LCDDisplay:
     def _create_landscape_overlay(self, overlay_layer, metrics, total_h, max_w, 
                                   font, base_font_size, corner_radius, img_h, overlay_nudge):
         """Create overlay for landscape orientation"""
-        padding = max(6, base_font_size // 3) + 6
-        box_w = max_w + padding * 2
-        box_h = total_h + padding * 2
+        # Stałe wymiary dla landscape (480x320)
+        padding = 20
+        box_w = 70   # Zmniejszone o 50% (było 140)
+        box_h = 36   # Zmniejszone o 60% (było 90) 
         
         # Create small RGBA box for overlay
         box_layer = Image.new('RGBA', (box_w, box_h), (0, 0, 0, 0))
@@ -187,7 +198,7 @@ class LCDDisplay:
             draw_box.rectangle((0, 0, box_w, box_h), fill=(0, 0, 0, 200))
         
         # Draw text with shadow
-        yb = box_h - padding
+        yb = box_h - padding + 4  # Podniesienie o 3 piksele w górę
         shadow_offset = max(1, int(base_font_size * 0.08)) if isinstance(font, ImageFont.FreeTypeFont) else 1
         spacing = 4
         
@@ -196,8 +207,8 @@ class LCDDisplay:
             # Shadow
             draw_box.text((xb + shadow_offset, yb - txt_h + shadow_offset), txt, 
                          font=font, fill=(0, 0, 0, 200))
-            # Text
-            draw_box.text((xb, yb - txt_h), txt, font=font, fill=(255, 255, 255, 255))
+            # Text - lekko szary z przezroczystością
+            draw_box.text((xb, yb - txt_h), txt, font=font, fill=(220, 220, 220, 230))
             yb -= (txt_h + spacing)
         
         # Rotate and position
@@ -213,13 +224,16 @@ class LCDDisplay:
     def _create_portrait_overlay(self, draw, metrics, total_h, max_w, 
                                 font, base_font_size, corner_radius, img_w, img_h, margin, overlay_nudge):
         """Create overlay for portrait orientation"""
-        padding = max(6, base_font_size // 3) + 6
+        # Stałe wymiary dla portrait (320x480)
+        padding = 20
+        box_w = 90   # Zmniejszone o 50% (było 180)
+        box_h = 44   # Zmniejszone o 60% (było 110)
         
         # Calculate rectangle bounds
         rect_right = img_w - margin + padding
-        rect_left = img_w - margin - max_w - padding
+        rect_left = rect_right - box_w
         rect_bottom = img_h - margin + padding - overlay_nudge
-        rect_top = rect_bottom - total_h - padding
+        rect_top = rect_bottom - box_h
         
         # Draw background rectangle
         try:
@@ -229,7 +243,7 @@ class LCDDisplay:
             draw.rectangle((rect_left, rect_top, rect_right, rect_bottom), fill=(0, 0, 0, 200))
         
         # Draw text with shadow
-        y = rect_bottom - padding
+        y = rect_bottom - padding - 3  # Podniesienie o 3 piksele w górę
         shadow_offset = max(1, int(base_font_size * 0.08)) if isinstance(font, ImageFont.FreeTypeFont) else 1
         spacing = 4
         
@@ -238,14 +252,20 @@ class LCDDisplay:
             # Shadow
             draw.text((x + shadow_offset, y - txt_h + shadow_offset), txt, 
                      font=font, fill=(0, 0, 0, 200))
-            # Text
-            draw.text((x, y - txt_h), txt, font=font, fill=(255, 255, 255, 255))
+            # Text - lekko szary z przezroczystością
+            draw.text((x, y - txt_h), txt, font=font, fill=(220, 220, 220, 230))
             y -= (txt_h + spacing)
     
-    def _send_image_to_lcd(self, image):
-        """Send final image to LCD display"""
+    def _send_image_to_lcd(self, image, with_overlay=False):
+        """Send final image to LCD display
+        
+        Args:
+            image: PIL Image to send
+            with_overlay: Whether this image includes overlay (for logging)
+        """
         try:
-            debug_print(f"display_image_with_overlay: final image size before send {image.size}, mode={image.mode}")
+            overlay_text = " (with overlay)" if with_overlay else ""
+            debug_print(f"display_image_with_overlay: sending {image.size} image{overlay_text}, mode={image.mode}")
             
             # Ensure correct size for LCD
             try:
@@ -314,9 +334,9 @@ class LCDDisplay:
             # Add overlay if requested
             if show_time or show_date:
                 image = self._add_text_overlay(image, show_time, show_date)
-            
-            # Send to LCD
-            return self._send_image_to_lcd(image)
+                return self._send_image_to_lcd(image, with_overlay=True)
+            else:
+                return self._send_image_to_lcd(image, with_overlay=False)
             
         except Exception as e:
             debug_print(f"Error displaying image with overlay: {e}", 'error')
@@ -330,8 +350,11 @@ class LCDDisplay:
         overlay_layer = Image.new('RGBA', (img_w, img_h), (0, 0, 0, 0))
         draw = ImageDraw.Draw(overlay_layer)
         
+        # Check orientation first
+        is_landscape = getattr(self, 'frame_orientation', 'Portrait') == 'Landscape'
+        
         # Prepare font and text
-        font, base_font_size = self._create_overlay_font(img_w, img_h)
+        font, base_font_size = self._create_overlay_font(img_w, img_h, is_landscape)
         texts = self._prepare_overlay_texts(show_time, show_date)
         
         if not texts:

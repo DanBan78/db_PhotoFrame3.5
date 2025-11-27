@@ -15,13 +15,19 @@ class ConfigManager:
         self.config_path = config_path
         self._config = None
     
-    def load_config(self, force_reload=False):
-        """Load configuration from file with caching"""
+    def load_config(self, force_reload=False, silent=False):
+        """Load configuration from file with caching
+        
+        Args:
+            force_reload: Force reload from disk even if cached
+            silent: Don't print debug messages (for periodic checks)
+        """
         if self._config is None or force_reload:
             try:
                 with open(self.config_path, 'r', encoding='utf-8') as f:
                     self._config = yaml.safe_load(f) or {}
-                debug_print(f"Configuration loaded from {self.config_path}")
+                if not silent:
+                    debug_print(f"Configuration loaded from {self.config_path}")
             except (FileNotFoundError, yaml.YAMLError, PermissionError) as e:
                 debug_print(f"Error loading config: {e}", 'error')
                 self._config = self.get_default_config()

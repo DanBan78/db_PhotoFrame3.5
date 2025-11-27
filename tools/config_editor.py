@@ -82,7 +82,25 @@ class ConfigEditor:
     def __init__(self):
         self.window = tk.Tk()
         self.window.title("Photo Frame Configuration")
-        self.window.geometry("700x300")
+        
+        # Set window size
+        window_width = 700
+        window_height = 300
+        
+        # Get screen dimensions
+        screen_width = self.window.winfo_screenwidth()
+        screen_height = self.window.winfo_screenheight()
+        
+        # Calculate position for bottom-right corner (above taskbar)
+        # Taskbar is typically 40-50 pixels, so we add some margin
+        taskbar_height = 50
+        margin = 10
+        
+        x_position = screen_width - window_width - margin
+        y_position = screen_height - window_height - taskbar_height - margin -50
+        
+        # Set geometry with position
+        self.window.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
         self.window.resizable(False, False)
 
         # Load history first
@@ -134,9 +152,10 @@ class ConfigEditor:
 
         y += 36
         ttk.Label(self.window, text="Change interval (sec)").place(x=10, y=y)
-        # Replace spinbox with a slider from 5 to 300 seconds
-        self.interval_var = tk.IntVar(value=10)
-        self.interval_scale = ttk.Scale(self.window, from_=5, to=300, orient='horizontal', command=lambda v: self.interval_var.set(int(float(v))))
+        # Replace spinbox with a slider from 4 to 300 seconds with 4-second steps
+        self.interval_var = tk.IntVar(value=12)
+        self.interval_scale = ttk.Scale(self.window, from_=4, to=300, orient='horizontal', 
+                                       command=lambda v: self.interval_var.set(int(float(v)) // 4 * 4))
         self.interval_scale.place(x=140, y=y, width=520)
         # Show current value label
         self.interval_value_label = ttk.Label(self.window, textvariable=self.interval_var)
@@ -149,13 +168,15 @@ class ConfigEditor:
         self.aspect_var = tk.BooleanVar(value=True)
         self.aspect_check = ttk.Checkbutton(self.window, text="Maintain aspect ratio", variable=self.aspect_var)
         self.aspect_check.place(x=180, y=y)
+        # Add show_time checkbox
+        self.show_time_var = tk.BooleanVar(value=True)
+        self.show_time_check = ttk.Checkbutton(self.window, text="Show clock", variable=self.show_time_var)
+        self.show_time_check.place(x=410, y=y)
 
         # Buttons
-        y += 25
+        y += 40
         self.save_btn = ttk.Button(self.window, text="Save", command=self.on_save_run)
-        self.save_btn.place(x=120, y=y, width=140, height=40)
-        self.exit_btn = ttk.Button(self.window, text="Exit App", command=self.on_exit)
-        self.exit_btn.place(x=300, y=y, width=140, height=40)
+        self.save_btn.place(x=540, y=y, width=140, height=60)
 
         self.load_config()
         # Removed default folders loading
@@ -252,6 +273,10 @@ class ConfigEditor:
                     pass
                 self.random_var.set(cfg.get('PHOTO_FRAME_RANDOM', False))
                 self.aspect_var.set(cfg.get('PHOTO_FRAME_MAINTAIN_ASPECT_RATIO', True))
+                
+                # Load show_time from slideshow section
+                slideshow = data.get('slideshow', {})
+                self.show_time_var.set(slideshow.get('show_time', True))
             except Exception as e:
                 print(f"Error loading config: {e}")
 
@@ -366,6 +391,14 @@ class ConfigEditor:
         cfg['config']['PHOTO_FRAME_INTERVAL'] = cfg['photos']['slideshow_interval']
         cfg['config']['PHOTO_FRAME_RANDOM'] = bool(self.random_var.get())
         cfg['config']['PHOTO_FRAME_MAINTAIN_ASPECT_RATIO'] = bool(self.aspect_var.get())
+
+        # Save slideshow section with show_time
+        if 'slideshow' not in cfg:
+            cfg['slideshow'] = {}
+        cfg['slideshow']['interval'] = cfg['photos']['slideshow_interval']
+        cfg['slideshow']['show_time'] = bool(self.show_time_var.get())
+        cfg['slideshow']['show_date'] = False  # Keep date disabled
+        cfg['slideshow']['shuffle'] = bool(self.random_var.get())
 
         try:
             with CONFIG_PATH.open("w", encoding="utf-8") as f:
