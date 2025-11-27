@@ -11,33 +11,9 @@ import threading
 import yaml
 from pathlib import Path
 
-# Debug configuration
-DEBUG_ENABLED = True
-DEBUG_LEVEL = 'info'
-
-def load_debug_config():
-    """Load debug settings from config file"""
-    global DEBUG_ENABLED, DEBUG_LEVEL
-    try:
-        config_path = Path(__file__).parent / "tools" / "config.yaml"
-        if config_path.exists():
-            with config_path.open("r", encoding="utf-8") as f:
-                config = yaml.safe_load(f) or {}
-                debug_config = config.get('debug', {})
-                DEBUG_ENABLED = debug_config.get('enabled', True)
-                DEBUG_LEVEL = debug_config.get('level', 'info')
-    except Exception:
-        pass  # Use defaults if config loading fails
-
-def debug_print(message, level='info'):
-    """Print debug message if debug is enabled and level matches"""
-    if not DEBUG_ENABLED:
-        return
-    if level == 'error' or DEBUG_LEVEL in ['info', 'debug']:
-        print(message)
-
-# Load debug config at startup
-load_debug_config()
+# Import shared utilities
+from lib.debug_utils import debug_print
+from lib.constants import *
 from PIL import Image
 import pystray
 
@@ -58,13 +34,13 @@ class PhotoFrameApp:
         self.tray_icon = None
         self.tray_thread = None
 
-        # Configuration editor activation state
-        self._activation_lock = threading.Lock()
-        self._last_activation = 0.0
-        self._activation_count = 0
-        self._activation_reset_timer = None
+        # Configuration editor state
         self._config_open = False
         self._config_process = None
+        
+        # Icon click throttling (1 second cooldown)
+        self._click_lock = threading.Lock()
+        self._last_click_time = 0.0
 
     def initialize(self):
         """Initialize the display and photoframe components."""
@@ -79,7 +55,7 @@ class PhotoFrameApp:
                 return False
 
             # Initialize photoframe and attach display
-            self.photoframe = PhotoFrame()
+            self.photoframe = PhotoFrame("tools/config.yaml")
             self.photoframe.set_display(self.display)
 
             debug_print("✅ Initialization complete")
@@ -139,18 +115,48 @@ class PhotoFrameApp:
             with config_file.open("w", encoding="utf-8") as f:
                 yaml.safe_dump(cfg, f, sort_keys=False)
                 
+        except (FileNotFoundError, yaml.YAMLError, PermissionError) as e:
+            debug_print(f"Error accessing config files: {e}", 'error')
         except Exception as e:
-            debug_print(f"Error initializing default folders: {e}", 'error')
+            debug_print(f"Unexpected error initializing default folders: {e}", 'error')
     
-    def next_photo(self, icon, item):
-        """Next photo (triggered by double-click on tray icon)"""
-        debug_print("🖱️ Next photo triggered by double-click on tray icon")
-        if self.photoframe:
-            self.photoframe.next_image()
-            self.photoframe.show_current_image_now()
-            print("📷 Skipped to next photo")
-        else:
-            print("❌ No photoframe instance")
+    def tray_icon_clicked(self, icon, item):
+        """Handler for tray icon click - switches to default folders with 1-second cooldown"""
+        try:
+            current_time = time.time()
+            
+            # Log every attempt to click
+            print(f"🖱️ Tray icon clicked at {current_time}")
+            
+            # Try to acquire lock without blocking - if can't acquire, another click is processing
+            if not self._click_lock.acquire(blocking=False):
+                debug_print("⏱️ Click ignored (already processing)")
+                print("⏱️ Click ignored (already processing)")
+                return
+            
+            try:
+                # Check if within cooldown period (1 second)
+                time_since_last = current_time - self._last_click_time
+                if time_since_last < 1.0:
+                    debug_print(f"⏱️ Click ignored (cooldown active, {time_since_last:.2f}s since last)")
+                    print(f"⏱️ Click ignored (cooldown active, {time_since_last:.2f}s since last)")
+                    return
+                
+                # Update last click time BEFORE executing to block concurrent clicks
+                self._last_click_time = current_time
+                
+                # Execute switch to default folder
+                debug_print("🖱️ Tray icon clicked - switching to default folder")
+                print("✅ Processing click - switching to default folder")
+                self.switch_to_default_folder()
+                print("✅ Finished switching to default folder")
+                
+            finally:
+                self._click_lock.release()
+            
+        except Exception as e:
+            debug_print(f"Error handling tray icon click: {e}", 'error')
+            print(f"❌ Error handling tray icon click: {e}")
     
     def switch_orientation(self, icon, item):
         """Tray menu: Switch orientation"""
@@ -159,43 +165,6 @@ class PhotoFrameApp:
             self.photoframe.switch_orientation()
         else:
             print("❌ No photoframe instance")
-    
-    def open_config_handler(self, icon, item):
-        """Handler wired to tray activation; requires two activations within threshold to open config."""
-        try:
-            now = time.time()
-            threshold = 0.5
-            with self._activation_lock:
-                # reset count if too long since last
-                if now - self._last_activation > threshold:
-                    self._activation_count = 1
-                else:
-                    self._activation_count += 1
-                self._last_activation = now
-
-                # cancel previous reset timer and start a new one
-                if self._activation_reset_timer:
-                    try:
-                        self._activation_reset_timer.cancel()
-                    except Exception:
-                        pass
-                def _reset():
-                    with self._activation_lock:
-                        self._activation_count = 0
-                self._activation_reset_timer = threading.Timer(threshold + 0.1, _reset)
-                self._activation_reset_timer.daemon = True
-                self._activation_reset_timer.start()
-
-                if self._activation_count >= 2:
-                    # double-activation detected
-                    self._activation_count = 0
-                    # Open configuration if not already open
-                    if not self._config_open:
-                        threading.Thread(target=self._open_config_action, daemon=True).start()
-                    else:
-                        print("⚙️ Configuration already open")
-        except Exception as e:
-            print(f"Error handling tray activation: {e}")
 
     def _open_config_menu_only(self, icon, item):
         """Handler only for menu item - opens config immediately"""
@@ -246,51 +215,6 @@ class PhotoFrameApp:
         except Exception as e:
             print(f"❌ Failed to open configuration: {e}")
 
-    def _icon_click_handler(self, icon, item):
-        """Handle clicks on tray icon - single click: next photo, double click: config"""
-        try:
-            now = time.time()
-            threshold = 0.5
-            with self._activation_lock:
-                # reset count if too long since last
-                if now - self._last_activation > threshold:
-                    self._activation_count = 1
-                else:
-                    self._activation_count += 1
-                self._last_activation = now
-
-                # cancel previous reset timer and start a new one
-                if self._activation_reset_timer:
-                    try:
-                        self._activation_reset_timer.cancel()
-                    except Exception:
-                        pass
-                def _reset():
-                    with self._activation_lock:
-                        self._activation_count = 0
-                self._activation_reset_timer = threading.Timer(threshold, _reset)
-                self._activation_reset_timer.daemon = True
-                self._activation_reset_timer.start()
-
-                if self._activation_count >= 2:
-                    # double-activation detected - switch to default folder
-                    self._activation_count = 0
-                    if self._activation_reset_timer:
-                        try:
-                            self._activation_reset_timer.cancel()
-                        except Exception:
-                            pass
-                    debug_print("[tray] Double click - switch to default folder")
-                    threading.Thread(target=self.switch_to_default_folder, daemon=True).start()
-        except Exception as e:
-            print(f"Error handling icon click: {e}")
-
-    # Note: some pystray backends do not support explicit double-click handlers.
-    # We use a default menu item so that clicking the icon invokes the configuration
-    # action on most platforms/backends. If your backend still doesn't activate
-    # the default action on click, tell me the pystray version and platform and
-    # I'll implement a backend-specific workaround.
-    
     def exit_app(self, icon, item):
         """Tray menu: Exit application"""
         debug_print("🛑 Exiting application...")
@@ -324,43 +248,77 @@ class PhotoFrameApp:
         except Exception as e:
             print(f"❌ Failed to refresh configuration editor: {e}")
 
-    def switch_to_default_folder(self):
-        """Switch to default folder for current orientation and show first image"""
+    def switch_to_default_folder(self, icon=None, item=None):
+        """Set default folder (first from history) for current orientation"""
         try:
             if not self.photoframe:
+                debug_print("No photoframe instance available")
                 return
                 
-            # Load current config to get default folders
-            config = self.photoframe.load_config(self.photoframe.config_path)
-            photos_config = config.get('photos', {})
-            current_orientation = photos_config.get('orientation', 'landscape').lower()
+            # Get current orientation from config
+            config = self.photoframe.load_config()
+            current_orientation = config.get('photos', {}).get('orientation', 'portrait').lower()
             
-            # Get default folder based on orientation
-            if current_orientation == 'portrait':
-                default_folder = photos_config.get('default_portrait_folder', '')
-            else:
-                default_folder = photos_config.get('default_landscape_folder', '')
+            # Read appropriate history file - ALWAYS use first line (default)
+            if current_orientation.startswith('p'):  # portrait
+                history_file = Path("tools/portrait_folders_history.txt")
+            else:  # landscape
+                history_file = Path("tools/landscape_folders_history.txt")
             
-            if default_folder and os.path.exists(default_folder):
-                # Update config with default folder
-                if current_orientation == 'portrait':
-                    photos_config['portrait_folder'] = default_folder
-                else:
-                    photos_config['landscape_folder'] = default_folder
+            if not history_file.exists():
+                debug_print(f"History file not found: {history_file}")
+                return
                 
-                # Save updated config
-                with open(self.photoframe.config_path, 'w', encoding='utf-8') as f:
-                    import yaml
-                    yaml.safe_dump(config, f, sort_keys=False)
+            # Read first line (default folder)
+            with open(history_file, 'r', encoding='utf-8') as f:
+                lines = [line.strip() for line in f.readlines() if line.strip()]
                 
-                # Reload and show first image
-                self.photoframe.reload_config()
-                debug_print(f"🔄 Switched to default {current_orientation} folder: {default_folder}")
+            if not lines:
+                debug_print(f"No folders in history file: {history_file}")
+                return
+                
+            # ALWAYS use first folder from history (index 0)
+            default_folder = lines[0]
+            
+            if not os.path.exists(default_folder):
+                debug_print(f"Default folder does not exist: {default_folder}")
+                return
+            
+            debug_print(f"🔄 Setting default {current_orientation} folder: {default_folder}")
+            print(f"🔄 Switching to default folder: {default_folder}")
+            
+            # Update config with default folder
+            if current_orientation.startswith('p'):  # portrait
+                config['photos']['portrait_folder'] = default_folder
+                config['config']['PHOTO_FRAME_FOLDER_PORTRAIT'] = default_folder
+                config['config']['PORTRAIT_HISTORY_LINE'] = 0
+            else:  # landscape
+                config['photos']['landscape_folder'] = default_folder
+                config['config']['PHOTO_FRAME_FOLDER_LANDSCAPE'] = default_folder
+                config['config']['LANDSCAPE_HISTORY_LINE'] = 0
+            
+            # Save config
+            from lib.config_manager import config_manager
+            if config_manager.save_config(config):
+                print(f"✅ Config saved with default folder")
             else:
-                print(f"⚠️  No valid default {current_orientation} folder configured")
-                
+                print(f"❌ Failed to save config")
+                return
+            
+            # Update photoframe's in-memory config
+            self.photoframe.config = config
+            
+            # Reload images ONCE and show first image immediately
+            if self.photoframe.running:
+                self.photoframe.current_images = self.photoframe.load_images()
+                self.photoframe.current_index = 0
+                # Show the first image from new folder immediately
+                self.photoframe.show_current_image_now()
+                print(f"✅ Loaded {len(self.photoframe.current_images)} images from default folder")
+            
         except Exception as e:
-            print(f"❌ Error switching to default folder: {e}")
+            debug_print(f"❌ Error switching to default folder: {e}", 'error')
+            print(f"❌ Error: {e}")
     
     def start_slideshow(self):
         """Start the photo slideshow"""
@@ -448,7 +406,7 @@ class PhotoFrameApp:
                 icon_image = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
 
             menu = pystray.Menu(
-                pystray.MenuItem('Next Photo (Hidden)', self._icon_click_handler, default=True, visible=False),
+                pystray.MenuItem('Switch to Default Folder', self.tray_icon_clicked, default=True, visible=False),
                 pystray.MenuItem('Switch Orientation', self.switch_orientation),
                 pystray.MenuItem('Open Configuration', self._open_config_menu_only),
                 pystray.MenuItem('Exit Photo Frame', self.exit_app)

@@ -866,3 +866,118 @@ SystemExit: 0
 26.11.2025 23:46:43 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
 26.11.2025 23:46:56 [WARNING] (Write line) Too fast! Slow down!
 26.11.2025 23:46:56 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 00:15:14 [DEBUG] HW revision: A
+27.11.2025 00:15:14 [DEBUG] Static COM port: COM3
+27.11.2025 00:15:14 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 00:15:36 [DEBUG] HW revision: A
+27.11.2025 00:15:36 [DEBUG] Static COM port: COM3
+27.11.2025 00:15:36 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 00:17:10 [DEBUG] HW revision: A
+27.11.2025 00:17:10 [DEBUG] Static COM port: COM3
+27.11.2025 00:17:10 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 00:20:30 [DEBUG] HW revision: A
+27.11.2025 00:20:30 [DEBUG] Static COM port: COM3
+27.11.2025 00:20:30 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 00:25:34 [DEBUG] HW revision: A
+27.11.2025 00:25:34 [DEBUG] Static COM port: COM3
+27.11.2025 00:25:34 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 00:29:25 [DEBUG] HW revision: A
+27.11.2025 00:29:25 [DEBUG] Static COM port: COM3
+27.11.2025 00:29:25 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 00:29:38 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 00:33:46 [DEBUG] HW revision: A
+27.11.2025 00:33:46 [DEBUG] Static COM port: COM3
+27.11.2025 00:33:46 [ERROR] Cannot open COM port COM3: could not open port 'COM3': PermissionError(13, 'Odmowa dostêpu.', None, 5)
+27.11.2025 00:33:53 [DEBUG] HW revision: A
+27.11.2025 00:33:53 [DEBUG] Static COM port: COM3
+27.11.2025 00:33:53 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 18:49:50 [DEBUG] HW revision: A
+27.11.2025 18:49:50 [DEBUG] Static COM port: COM3
+27.11.2025 18:49:50 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 19:02:43 [DEBUG] HW revision: A
+27.11.2025 19:02:43 [DEBUG] Static COM port: COM3
+27.11.2025 19:02:43 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 19:03:12 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:03:12 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:04:10 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:04:10 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:04:10 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:04:10 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:06:15 [DEBUG] HW revision: A
+27.11.2025 19:06:15 [DEBUG] Static COM port: COM3
+27.11.2025 19:06:15 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 19:06:28 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:06:28 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:06:54 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:06:54 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:08:10 [DEBUG] HW revision: A
+27.11.2025 19:08:10 [DEBUG] Static COM port: COM3
+27.11.2025 19:08:10 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 19:08:23 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:08:23 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:08:24 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:08:24 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:08:53 [DEBUG] HW revision: A
+27.11.2025 19:08:53 [DEBUG] Static COM port: COM3
+27.11.2025 19:08:53 [ERROR] Cannot open COM port COM3: could not open port 'COM3': PermissionError(13, 'Odmowa dostêpu.', None, 5)
+27.11.2025 19:09:08 [DEBUG] HW revision: A
+27.11.2025 19:09:08 [DEBUG] Static COM port: COM3
+27.11.2025 19:09:08 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 19:09:22 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:09:22 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:12:42 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:12:42 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:13:26 [DEBUG] HW revision: A
+27.11.2025 19:13:26 [DEBUG] Static COM port: COM3
+27.11.2025 19:13:26 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 19:14:53 [DEBUG] HW revision: A
+27.11.2025 19:14:53 [DEBUG] Static COM port: COM3
+27.11.2025 19:14:53 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 19:15:06 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:15:06 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:15:06 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:15:06 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:16:29 [DEBUG] HW revision: A
+27.11.2025 19:16:29 [DEBUG] Static COM port: COM3
+27.11.2025 19:16:29 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 19:16:42 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:16:42 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:16:42 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:16:42 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:18:24 [DEBUG] HW revision: A
+27.11.2025 19:18:24 [DEBUG] Static COM port: COM3
+27.11.2025 19:18:24 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 19:18:38 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:19:32 [DEBUG] HW revision: A
+27.11.2025 19:19:32 [DEBUG] Static COM port: COM3
+27.11.2025 19:19:32 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 19:19:45 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:19:45 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:21:30 [DEBUG] HW revision: A
+27.11.2025 19:21:30 [DEBUG] Static COM port: COM3
+27.11.2025 19:21:30 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 19:22:51 [DEBUG] HW revision: A
+27.11.2025 19:22:51 [DEBUG] Static COM port: COM3
+27.11.2025 19:22:51 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 19:25:58 [DEBUG] HW revision: A
+27.11.2025 19:25:58 [DEBUG] Static COM port: COM3
+27.11.2025 19:25:58 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 19:26:24 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:26:24 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:32:38 [DEBUG] HW revision: A
+27.11.2025 19:32:38 [DEBUG] Static COM port: COM3
+27.11.2025 19:32:38 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 19:33:43 [DEBUG] HW revision: A
+27.11.2025 19:33:43 [DEBUG] Static COM port: COM3
+27.11.2025 19:33:43 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 19:35:50 [DEBUG] HW revision: A
+27.11.2025 19:35:50 [DEBUG] Static COM port: COM3
+27.11.2025 19:35:50 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 19:37:02 [DEBUG] HW revision: A
+27.11.2025 19:37:02 [DEBUG] Static COM port: COM3
+27.11.2025 19:37:02 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 19:39:13 [DEBUG] HW revision: A
+27.11.2025 19:39:13 [DEBUG] Static COM port: COM3
+27.11.2025 19:39:13 [DEBUG] HW sub-revision: SubRevision.USBMONITOR_3_5
+27.11.2025 19:39:39 [WARNING] (Write line) Too fast! Slow down!
+27.11.2025 19:39:39 [WARNING] (Write line) Too fast! Slow down!

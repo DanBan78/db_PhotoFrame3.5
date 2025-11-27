@@ -10,36 +10,17 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from lib.lcd import lcd_comm_rev_a
 
-# Debug configuration
-DEBUG_ENABLED = True
-
-def load_debug_config():
-    """Load debug settings from config file"""
-    global DEBUG_ENABLED
-    try:
-        config_path = Path(__file__).parent.parent / "tools" / "config.yaml"
-        if config_path.exists():
-            with config_path.open("r", encoding="utf-8") as f:
-                config = yaml.safe_load(f) or {}
-                debug_config = config.get('debug', {})
-                DEBUG_ENABLED = debug_config.get('enabled', True)
-    except Exception:
-        pass
-
-def debug_print(message, level='info'):
-    """Print debug message if debug is enabled"""
-    if DEBUG_ENABLED and level in ['info', 'debug', 'error']:
-        print(message)
-
-load_debug_config()
+# Import shared utilities
+from .debug_utils import debug_print
+from .constants import *
 
 class LCDDisplay:
     def __init__(self, serial_port="COM3", brightness=85):
         self.serial_port = serial_port
         self.brightness = brightness
         # default physical screen size for portrait device
-        self.width = 320
-        self.height = 480
+        self.width = DEFAULT_LCD_WIDTH
+        self.height = DEFAULT_LCD_HEIGHT
         self.lcd = None
         # load photo-frame orientation settings from config.yaml if available
         # Prefer an external config file (next to the EXE or working directory)
@@ -56,8 +37,10 @@ class LCDDisplay:
                     with open(cfg_path, 'r', encoding='utf-8') as f:
                         cfg = yaml.safe_load(f) or {}
                     debug_print(f"Loaded config from: {cfg_path}")
-                except Exception as e:
+                except (FileNotFoundError, yaml.YAMLError, PermissionError) as e:
                     debug_print(f"Failed to load config '{cfg_path}': {e}", 'error')
+                except Exception as e:
+                    debug_print(f"Unexpected error loading config '{cfg_path}': {e}", 'error')
                     cfg = {}
             else:
                 cfg = {}
@@ -120,7 +103,10 @@ class LCDDisplay:
             # Ensure image matches the LCD's expected size before sending.
             try:
                 try:
-                    lcd_w, lcd_h = self.lcd.get_width(), self.lcd.get_height()
+                    if self.lcd and hasattr(self.lcd, 'get_width') and hasattr(self.lcd, 'get_height'):
+                        lcd_w, lcd_h = self.lcd.get_width(), self.lcd.get_height()
+                    else:
+                        lcd_w, lcd_h = self.width, self.height
                 except Exception:
                     lcd_w, lcd_h = self.width, self.height
                 if image.size != (lcd_w, lcd_h):
@@ -143,180 +129,240 @@ class LCDDisplay:
             debug_print(f"Error displaying image {image_path}: {e}", 'error')
             return False
     
+    def _create_overlay_font(self, img_w, img_h):
+        """Create font for overlay text"""
+        try:
+            # Increase font size for better readability
+            base_font_size = max(MIN_FONT_SIZE, int(min(img_w, img_h) * FONT_SIZE_MULTIPLIER)) + FONT_SIZE_BONUS
+            return ImageFont.truetype(DEFAULT_FONT_PATH, base_font_size), base_font_size
+        except Exception:
+            # Default font does not accept size param; keep default
+            return ImageFont.load_default(), MIN_FONT_SIZE
+    
+    def _prepare_overlay_texts(self, show_time, show_date):
+        """Prepare text content for overlay"""
+        texts = []
+        if show_time:
+            current_time = time.strftime("%H:%M")
+            texts.append(current_time)
+        # Date functionality removed per user request
+        return texts
+    
+    def _calculate_text_metrics(self, texts, font, draw):
+        """Calculate text dimensions and layout metrics"""
+        metrics = []
+        total_h = 0
+        max_w = 0
+        spacing = 4  # Simple fixed spacing
+        
+        for txt in reversed(texts):
+            bbox = draw.textbbox((0, 0), txt, font=font)
+            txt_w = bbox[2] - bbox[0]
+            txt_h = bbox[3] - bbox[1]
+            metrics.append((txt, txt_w, txt_h))
+            total_h += txt_h + spacing
+            if txt_w > max_w:
+                max_w = txt_w
+        
+        if total_h > 0:
+            total_h -= spacing
+        
+        return metrics, total_h, max_w
+    
+    def _create_landscape_overlay(self, overlay_layer, metrics, total_h, max_w, 
+                                  font, base_font_size, corner_radius, img_h, overlay_nudge):
+        """Create overlay for landscape orientation"""
+        padding = max(6, base_font_size // 3) + 6
+        box_w = max_w + padding * 2
+        box_h = total_h + padding * 2
+        
+        # Create small RGBA box for overlay
+        box_layer = Image.new('RGBA', (box_w, box_h), (0, 0, 0, 0))
+        draw_box = ImageDraw.Draw(box_layer)
+        
+        # Draw rounded rectangle background
+        try:
+            draw_box.rounded_rectangle((0, 0, box_w, box_h), radius=corner_radius, fill=(0, 0, 0, 200))
+        except Exception:
+            draw_box.rectangle((0, 0, box_w, box_h), fill=(0, 0, 0, 200))
+        
+        # Draw text with shadow
+        yb = box_h - padding
+        shadow_offset = max(1, int(base_font_size * 0.08)) if isinstance(font, ImageFont.FreeTypeFont) else 1
+        spacing = 4
+        
+        for txt, txt_w, txt_h in metrics:
+            xb = (box_w - txt_w) // 2
+            # Shadow
+            draw_box.text((xb + shadow_offset, yb - txt_h + shadow_offset), txt, 
+                         font=font, fill=(0, 0, 0, 200))
+            # Text
+            draw_box.text((xb, yb - txt_h), txt, font=font, fill=(255, 255, 255, 255))
+            yb -= (txt_h + spacing)
+        
+        # Rotate and position
+        try:
+            rotated_box = box_layer.rotate(270, expand=True, resample=Image.Resampling.BICUBIC)
+        except Exception:
+            rotated_box = box_layer
+        
+        pos_x = 0
+        pos_y = max(0, img_h - rotated_box.height - overlay_nudge)
+        overlay_layer.paste(rotated_box, (pos_x, pos_y), rotated_box)
+    
+    def _create_portrait_overlay(self, draw, metrics, total_h, max_w, 
+                                font, base_font_size, corner_radius, img_w, img_h, margin, overlay_nudge):
+        """Create overlay for portrait orientation"""
+        padding = max(6, base_font_size // 3) + 6
+        
+        # Calculate rectangle bounds
+        rect_right = img_w - margin + padding
+        rect_left = img_w - margin - max_w - padding
+        rect_bottom = img_h - margin + padding - overlay_nudge
+        rect_top = rect_bottom - total_h - padding
+        
+        # Draw background rectangle
+        try:
+            draw.rounded_rectangle((rect_left, rect_top, rect_right, rect_bottom), 
+                                 radius=corner_radius, fill=(0, 0, 0, 200))
+        except Exception:
+            draw.rectangle((rect_left, rect_top, rect_right, rect_bottom), fill=(0, 0, 0, 200))
+        
+        # Draw text with shadow
+        y = rect_bottom - padding
+        shadow_offset = max(1, int(base_font_size * 0.08)) if isinstance(font, ImageFont.FreeTypeFont) else 1
+        spacing = 4
+        
+        for txt, txt_w, txt_h in metrics:
+            x = img_w - margin - txt_w
+            # Shadow
+            draw.text((x + shadow_offset, y - txt_h + shadow_offset), txt, 
+                     font=font, fill=(0, 0, 0, 200))
+            # Text
+            draw.text((x, y - txt_h), txt, font=font, fill=(255, 255, 255, 255))
+            y -= (txt_h + spacing)
+    
+    def _send_image_to_lcd(self, image):
+        """Send final image to LCD display"""
+        try:
+            debug_print(f"display_image_with_overlay: final image size before send {image.size}, mode={image.mode}")
+            
+            # Ensure correct size for LCD
+            try:
+                if self.lcd and hasattr(self.lcd, 'get_width') and hasattr(self.lcd, 'get_height'):
+                    lcd_w, lcd_h = self.lcd.get_width(), self.lcd.get_height()
+                else:
+                    lcd_w, lcd_h = self.width, self.height
+            except Exception:
+                lcd_w, lcd_h = self.width, self.height
+            
+            if image.size != (lcd_w, lcd_h):
+                debug_print(f"display_image_with_overlay: resizing from {image.size} to {(lcd_w, lcd_h)}")
+                image = image.resize((lcd_w, lcd_h), Image.Resampling.LANCZOS)
+            
+            if self.lcd:
+                self.lcd.DisplayPILImage(image, 0, 0, image.size[0], image.size[1])
+            return True
+        except Exception:
+            # Fallback to bitmap display
+            return self._fallback_bitmap_display(image)
+    
+    def _fallback_bitmap_display(self, image):
+        """Fallback display method using temporary bitmap file"""
+        if not self.lcd:
+            debug_print("No LCD connection available for fallback display", 'error')
+            return False
+            
+        temp_path = f"{TEMP_IMAGE_PREFIX}{int(time.time())}.png"
+        try:
+            image.save(temp_path)
+            debug_print("display_image_with_overlay: DisplayPILImage failed, using DisplayBitmap fallback")
+            self.lcd.DisplayBitmap(str(temp_path), 0, 0)
+            return True
+        except Exception as e:
+            debug_print(f"Error in bitmap fallback: {e}", 'error')
+            return False
+        finally:
+            try:
+                os.remove(temp_path)
+            except (FileNotFoundError, PermissionError, OSError) as e:
+                debug_print(f"Could not remove temp file: {e}", 'debug')
+
     def display_image_with_overlay(self, image_path, show_time=True, show_date=True):
         """Display image with time/date overlay"""
         if not self.lcd:
             return False
             
         try:
-            # Load and prepare image for display (rotate/resize according to orientation and inverse)
+            # Load and prepare image
             image = Image.open(image_path)
             image = self._prepare_image_for_display(image)
-            # Ensure image matches LCD target BEFORE drawing overlay to avoid any non-uniform scaling
-            try:
-                try:
-                    lcd_w, lcd_h = self.lcd.get_width(), self.lcd.get_height()
-                except Exception:
-                    lcd_w, lcd_h = self.width, self.height
-                if image.size != (lcd_w, lcd_h):
-                    debug_print(f"display_image_with_overlay: resizing image from {image.size} to LCD target {(lcd_w,lcd_h)} before overlay")
-                    image = image.resize((lcd_w, lcd_h), Image.Resampling.LANCZOS)
-            except Exception:
-                pass
-
-            # Add overlay after final rotation/resizing so overlay is horizontal at the bottom
-            if show_time or show_date:
-                img_w, img_h = image.size
-
-                # Prepare an RGBA overlay layer and draw text onto it, then composite.
-                overlay_layer = Image.new('RGBA', (img_w, img_h), (0, 0, 0, 0))
-                draw = ImageDraw.Draw(overlay_layer)
-
-                # Try to load font and scale it relative to the prepared image size
-                try:
-                    # Increase font size for better readability (add 2 more points)
-                    base_font_size = max(16, int(min(img_w, img_h) * 0.04)) + 11
-                    font = ImageFont.truetype("res/fonts/roboto/Roboto-Bold.ttf", base_font_size)
-                except Exception:
-                    # Default font does not accept size param; keep default
-                    font = ImageFont.load_default()
-
-                # Get current time (only time; date removed per user request)
-                current_time = time.strftime("%H:%M")
-
-                # Compute positions relative to the actual image size
-                margin = int(max(8, min(img_w, img_h) * 0.02))
-
-                # Prepare text boxes and sizes (only time)
-                texts = []
-                if show_time:
-                    texts.append(current_time)
-
-                # Draw from bottom to top (date above time) on overlay layer
-                # First measure text sizes so we can draw a semi-transparent background box
-                metrics = []
-                total_h = 0
-                max_w = 0
-                spacing = int(margin / 2)
-                for txt in reversed(texts):
-                    bbox = draw.textbbox((0, 0), txt, font=font)
-                    txt_w = bbox[2] - bbox[0]
-                    txt_h = bbox[3] - bbox[1]
-                    metrics.append((txt, txt_w, txt_h))
-                    total_h += txt_h + spacing
-                    if txt_w > max_w:
-                        max_w = txt_w
-                if total_h > 0:
-                    total_h -= spacing
-
-                # Increase padding so overlay box grows with the larger font
-                padding = max(6, int(margin / 3)) + 6
-                corner_radius = min(12, padding)
-                # Small upward nudge so overlay doesn't sit exactly on the edge
-                # Reduced so overlay is closer to the bottom edge per user request
-                overlay_nudge = 1
-
-                # If Landscape: build a small overlay box, rotate it 270deg, then center it on screen
-                if getattr(self, 'frame_orientation', 'Portrait') == 'Landscape':
-                    box_w = max_w + padding * 2
-                    box_h = total_h + padding * 2
-                    # Create small RGBA box for overlay
-                    box_layer = Image.new('RGBA', (box_w, box_h), (0, 0, 0, 0))
-                    draw_box = ImageDraw.Draw(box_layer)
-                    # Draw rounded rectangle background on the box
-                    try:
-                        draw_box.rounded_rectangle((0, 0, box_w, box_h), radius=corner_radius, fill=(0, 0, 0, 200))
-                    except Exception:
-                        draw_box.rectangle((0, 0, box_w, box_h), fill=(0, 0, 0, 200))
-
-                    # Draw text lines centered horizontally inside the box (bottom-to-top)
-                    yb = box_h - padding
-                    shadow_offset = max(1, int(base_font_size * 0.08)) if isinstance(font, ImageFont.FreeTypeFont) else 1
-                    for txt, txt_w, txt_h in metrics:
-                        xb = (box_w - txt_w) // 2
-                        draw_box.text((xb + shadow_offset, yb - txt_h + shadow_offset), txt, font=font, fill=(0, 0, 0, 200))
-                        draw_box.text((xb, yb - txt_h), txt, font=font, fill=(255, 255, 255, 255))
-                        yb -= (txt_h + spacing)
-
-                    # Rotate the small box by 270 degrees and center it on the image
-                    try:
-                        rotated_box = box_layer.rotate(270, expand=True, resample=Image.Resampling.BICUBIC)
-                    except Exception:
-                        try:
-                            rotated_box = box_layer.rotate(270, expand=True)
-                        except Exception:
-                            rotated_box = box_layer
-
-                    # Anchor rotated box to the bottom-left corner (touching left edge);
-                    # nudge up by a few pixels so it isn't flush with the very bottom
-                    pos_x = 0
-                    pos_y = max(0, img_h - rotated_box.height - overlay_nudge)
-                    overlay_layer.paste(rotated_box, (pos_x, pos_y), rotated_box)
-
-                else:
-                    # For portrait: keep overlay at bottom-right drawn directly onto overlay_layer
-                    rect_right = img_w - margin + padding
-                    rect_left = img_w - margin - max_w - padding
-                    # Move the portrait overlay slightly up as well
-                    rect_bottom = img_h - margin + padding - overlay_nudge
-                    rect_top = rect_bottom - total_h - padding
-
-                    # Draw semi-transparent rounded rectangle as background for text
-                    try:
-                        draw.rounded_rectangle((rect_left, rect_top, rect_right, rect_bottom), radius=corner_radius, fill=(0, 0, 0, 200))
-                    except Exception:
-                        draw.rectangle((rect_left, rect_top, rect_right, rect_bottom), fill=(0, 0, 0, 200))
-
-                    # Now draw text lines on top of the rectangle from bottom to top
-                    y = rect_bottom - padding
-                    shadow_offset = max(1, int(base_font_size * 0.08)) if isinstance(font, ImageFont.FreeTypeFont) else 1
-                    for txt, txt_w, txt_h in metrics:
-                        x = img_w - margin - txt_w
-                        # Draw shadow then text
-                        draw.text((x + shadow_offset, y - txt_h + shadow_offset), txt, font=font, fill=(0, 0, 0, 200))
-                        draw.text((x, y - txt_h), txt, font=font, fill=(255, 255, 255, 255))
-                        y -= (txt_h + spacing)
-
-                # Composite overlay onto image
-                try:
-                    if image.mode != 'RGBA':
-                        base_img = image.convert('RGBA')
-                    else:
-                        base_img = image
-
-                    composed = Image.alpha_composite(base_img, overlay_layer)
-                    image = composed.convert('RGB')
-                except Exception as e:
-                    debug_print(f"display_image_with_overlay: compositing overlay failed: {e}", 'error')
             
-            # Display on LCD using DisplayPILImage
+            # Ensure correct size before overlay
             try:
-                debug_print(f"display_image_with_overlay: final image size before send {image.size}, mode={image.mode}")
-                try:
+                if self.lcd and hasattr(self.lcd, 'get_width') and hasattr(self.lcd, 'get_height'):
                     lcd_w, lcd_h = self.lcd.get_width(), self.lcd.get_height()
-                except Exception:
+                else:
                     lcd_w, lcd_h = self.width, self.height
-                if image.size != (lcd_w, lcd_h):
-                    debug_print(f"display_image_with_overlay: resizing image from {image.size} to LCD target {(lcd_w,lcd_h)} before send")
-                    image = image.resize((lcd_w, lcd_h), Image.Resampling.LANCZOS)
-                self.lcd.DisplayPILImage(image, 0, 0, image.size[0], image.size[1])
             except Exception:
-                # Fallback: save temporary file and use DisplayBitmap
-                temp_path = f"temp_display_{int(time.time())}.png"
-                image.save(temp_path)
-                try:
-                    debug_print("display_image_with_overlay: DisplayPILImage failed, using DisplayBitmap fallback")
-                    self.lcd.DisplayBitmap(str(temp_path), 0, 0)
-                finally:
-                    try:
-                        os.remove(temp_path)
-                    except:
-                        pass
-                
-            return True
+                lcd_w, lcd_h = self.width, self.height
+            
+            if image.size != (lcd_w, lcd_h):
+                debug_print(f"display_image_with_overlay: resizing image from {image.size} to LCD target {(lcd_w,lcd_h)} before overlay")
+                image = image.resize((lcd_w, lcd_h), Image.Resampling.LANCZOS)
+            
+            # Add overlay if requested
+            if show_time or show_date:
+                image = self._add_text_overlay(image, show_time, show_date)
+            
+            # Send to LCD
+            return self._send_image_to_lcd(image)
+            
         except Exception as e:
             debug_print(f"Error displaying image with overlay: {e}", 'error')
             return False
+    
+    def _add_text_overlay(self, image, show_time, show_date):
+        """Add text overlay to image"""
+        img_w, img_h = image.size
+        
+        # Create overlay layer
+        overlay_layer = Image.new('RGBA', (img_w, img_h), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay_layer)
+        
+        # Prepare font and text
+        font, base_font_size = self._create_overlay_font(img_w, img_h)
+        texts = self._prepare_overlay_texts(show_time, show_date)
+        
+        if not texts:
+            return image
+        
+        # Calculate layout metrics
+        metrics, total_h, max_w = self._calculate_text_metrics(texts, font, draw)
+        margin = int(max(8, min(img_w, img_h) * 0.02))
+        corner_radius = min(12, base_font_size // 2)
+        overlay_nudge = 1
+        
+        # Create overlay based on orientation
+        if getattr(self, 'frame_orientation', 'Portrait') == 'Landscape':
+            self._create_landscape_overlay(overlay_layer, metrics, total_h, max_w, 
+                                         font, base_font_size, corner_radius, img_h, overlay_nudge)
+        else:
+            self._create_portrait_overlay(draw, metrics, total_h, max_w, 
+                                        font, base_font_size, corner_radius, img_w, img_h, margin, overlay_nudge)
+        
+        # Composite overlay onto image
+        try:
+            if image.mode != 'RGBA':
+                base_img = image.convert('RGBA')
+            else:
+                base_img = image
+            
+            composed = Image.alpha_composite(base_img, overlay_layer)
+            return composed.convert('RGB')
+        except Exception as e:
+            debug_print(f"display_image_with_overlay: compositing overlay failed: {e}", 'error')
+            return image
     
     def clear_screen(self):
         """Clear LCD screen"""
@@ -327,17 +373,17 @@ class LCDDisplay:
                 try:
                     self.lcd.DisplayPILImage(black_image, 0, 0, black_image.size[0], black_image.size[1])
                 except Exception:
-                    tmp = "temp_black.png"
+                    tmp = TEMP_BLACK_IMAGE
                     black_image.save(tmp)
                     try:
                         self.lcd.DisplayBitmap(tmp, 0, 0)
                     finally:
                         try:
                             os.remove(tmp)
-                        except:
-                            pass
-            except:
-                pass
+                        except Exception as e:
+                            debug_print(f"Could not remove temp file: {e}", 'debug')
+            except Exception as e:
+                debug_print(f"Error clearing screen: {e}", 'error')
 
     def apply_config(self, cfg: dict):
         """Apply configuration at runtime (update orientation and inverse)."""
@@ -350,10 +396,10 @@ class LCDDisplay:
             self.frame_orientation = orientation if orientation in ('Portrait', 'Landscape') else 'Portrait'
             self.inverse = bool(inverse)
             # Adjust width/height according to frame orientation
-            if self.frame_orientation == 'Portrait':
-                self.width, self.height = 320, 480
+            if self.frame_orientation == ORIENTATION_PORTRAIT:
+                self.width, self.height = DEFAULT_LCD_WIDTH, DEFAULT_LCD_HEIGHT
             else:
-                self.width, self.height = 480, 320
+                self.width, self.height = DEFAULT_LCD_HEIGHT, DEFAULT_LCD_WIDTH
             debug_print(f"LCDDisplay.apply_config => frame_orientation={self.frame_orientation}, inverse={self.inverse}, target={self.width}x{self.height}")
         except Exception as e:
             debug_print(f"apply_config error: {e}", 'error')
@@ -458,11 +504,8 @@ class LCDDisplay:
                 try:
                     self.lcd.closeSerial()
                 except Exception:
-                    # try alternate name
-                    try:
-                        self.lcd.close_serial()
-                    except Exception:
-                        pass
+                    # closeSerial failed, LCD may already be closed
+                    debug_print("closeSerial method not available or failed", 'debug')
                 debug_print("LCD connection closed")
-            except:
-                pass
+            except Exception as e:
+                debug_print(f"Error during LCD cleanup: {e}", 'error')

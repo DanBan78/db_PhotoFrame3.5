@@ -8,36 +8,17 @@ import time
 import random
 import threading
 from pathlib import Path
-import yaml
 
-# Debug configuration
-DEBUG_ENABLED = True
-
-def load_debug_config():
-    """Load debug settings from config file"""
-    global DEBUG_ENABLED
-    try:
-        config_path = Path(__file__).parent.parent / "tools" / "config.yaml"
-        if config_path.exists():
-            with config_path.open("r", encoding="utf-8") as f:
-                config = yaml.safe_load(f) or {}
-                debug_config = config.get('debug', {})
-                DEBUG_ENABLED = debug_config.get('enabled', True)
-    except Exception:
-        pass
-
-def debug_print(message, level='info'):
-    """Print debug message if debug is enabled"""
-    if DEBUG_ENABLED and level in ['info', 'debug', 'error']:
-        print(message)
-
-load_debug_config()
+# Import shared utilities
+from .debug_utils import debug_print
+from .config_manager import config_manager
+from .constants import *
 
 class PhotoFrame:
-    def __init__(self, config_path="tools/config.yaml"):
-        # Load initial configuration from disk
-        self.config_path = config_path
-        self.config = self.load_config(config_path)
+    def __init__(self, config_path=DEFAULT_CONFIG_PATH):
+        # Load initial configuration using config manager
+        config_manager.config_path = config_path
+        self.config = config_manager.load_config()
         # Ensure photos section exists
         if 'photos' not in self.config:
             self.config['photos'] = {}
@@ -47,27 +28,14 @@ class PhotoFrame:
         self.current_index = 0
         self.slideshow_thread = None
         
-    def load_config(self, config_path):
-        """Load configuration from YAML file"""
-        try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                return yaml.safe_load(f)
-        except Exception as e:
-            debug_print(f"Error loading config: {e}", 'error')
-            return self.get_default_config()
+    def load_config(self):
+        """Load configuration using config manager"""
+        self.config = config_manager.load_config()
+        return self.config
     
     def get_default_config(self):
-        """Default configuration"""
-        return {
-            'display': {'serial_port': 'COM3', 'brightness': 85},
-            'photos': {
-                'portrait_folder': 'C:/.Source/Ramka/pionowe',
-                'landscape_folder': 'C:/.Source/Ramka/poziome',
-                'slideshow_interval': 10,
-                'orientation': 'landscape'
-            },
-            'overlay': {'show_time': True, 'show_date': True}
-        }
+        """Return default configuration"""
+        return config_manager.get_default_config()
     
     def set_display(self, display):
         """Set display controller"""
@@ -85,10 +53,10 @@ class PhotoFrame:
         except Exception as e:
             debug_print(f"Error setting display config in set_display: {e}", 'error')
 
-    def reload_config(self, config_path="tools/config.yaml"):
+    def reload_config(self):
         """Reload configuration from disk and apply to display/slideshow."""
         debug_print("Reloading configuration...")
-        new_cfg = self.load_config(config_path)
+        new_cfg = config_manager.load_config(force_reload=True)
         if not new_cfg:
             debug_print("Failed to reload config; keeping previous settings", 'error')
             return False
@@ -113,7 +81,7 @@ class PhotoFrame:
     def load_images(self):
         """Load images from configured folder"""
         # Read fresh configuration from disk to ensure we use the latest values
-        fresh_cfg = self.load_config(self.config_path) or {}
+        fresh_cfg = config_manager.load_config(force_reload=True)
         photos_cfg = fresh_cfg.get('photos', {}) if isinstance(fresh_cfg, dict) else {}
         config_cfg = fresh_cfg.get('config', {}) if isinstance(fresh_cfg, dict) else {}
 
@@ -192,7 +160,7 @@ class PhotoFrame:
             # Before displaying, re-read configuration from disk and apply it
             # to ensure we use the latest settings saved by the config editor.
             try:
-                fresh_cfg = self.load_config(self.config_path)
+                fresh_cfg = config_manager.load_config(force_reload=True)
                 if fresh_cfg:
                     self.config = fresh_cfg
                     if self.display and hasattr(self.display, 'apply_config'):
@@ -230,8 +198,9 @@ class PhotoFrame:
             # Move to next image
             self.current_index = (self.current_index + 1) % len(self.current_images)
             
-            # Wait for interval
-            time.sleep(self.config['photos']['slideshow_interval'])
+            # Wait for interval - check both new and old config locations
+            interval = self.config.get('slideshow', {}).get('interval') or self.config.get('photos', {}).get('slideshow_interval', 30)
+            time.sleep(interval)
     
     def stop_slideshow(self):
         """Stop the slideshow"""
@@ -274,11 +243,12 @@ class PhotoFrame:
         new_orientation = 'portrait' if current == 'landscape' else 'landscape'
         self.config['photos']['orientation'] = new_orientation
         
-        # Save to config file
+        # Save to config file using config manager
         try:
-            import yaml
-            with open(self.config_path, 'w', encoding='utf-8') as f:
-                yaml.safe_dump(self.config, f, sort_keys=False)
+            config_manager.save_config(self.config)
+            debug_print(f"Saved orientation change to config: {new_orientation}")
+            # Force reload to ensure consistency
+            self.config = config_manager.load_config(force_reload=True)
         except Exception as e:
             debug_print(f"Error saving orientation to config: {e}", 'error')
         
