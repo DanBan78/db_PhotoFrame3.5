@@ -16,6 +16,7 @@ Sekcja Photo Frame Configuration:
 """
 from __future__ import annotations
 
+import math
 import os
 import sys
 from pathlib import Path
@@ -45,6 +46,25 @@ SCALE_MODE_LABELS = {
     'fit': "Dopasuj (czarne pasy)",
     'fill': "Wypelnij ekran (przytnij)",
 }
+
+# Suwak interwalu: skok co 4 sekundy
+INTERVAL_MIN = 4
+INTERVAL_MAX = 300
+INTERVAL_STEP = 4
+
+
+def snap_interval(value):
+    """Zaokraglij interwal do najblizszej wielokrotnosci INTERVAL_STEP.
+
+    Zaokraglamy do NAJBLIZSZEJ, nie w dol - wczesniej wartosc 11 zamieniala sie
+    przy zapisie na 8 zamiast na 12. Polowki ida w gore (26 -> 28); wbudowane
+    round() zaokragla je do parzystej wielokrotnosci, wiec dawalo 26 -> 24.
+    """
+    try:
+        snapped = math.floor(float(value) / INTERVAL_STEP + 0.5) * INTERVAL_STEP
+    except (TypeError, ValueError):
+        snapped = INTERVAL_MIN
+    return max(INTERVAL_MIN, min(INTERVAL_MAX, int(snapped)))
 
 # Wlasna instancja - zapis idzie przez ten sam atomowy mechanizm z blokada
 # miedzyprocesowa, ktorego uzywa glowna aplikacja.
@@ -136,6 +156,9 @@ class ConfigEditor:
         except Exception:
             pass
 
+        # Chroni przed rekurencja, gdy sami przestawiamy suwak na wartosc ze skoku
+        self._interval_snapping = False
+
         # Load history first
         self.portrait_history = load_history(PORTRAIT_HISTORY)
         self.landscape_history = load_history(LANDSCAPE_HISTORY)
@@ -193,10 +216,8 @@ class ConfigEditor:
         ttk.Label(self.window, text="Change interval (sec)").place(x=10, y=y)
         # Replace spinbox with a slider from 4 to 300 seconds with 4-second steps
         self.interval_var = tk.IntVar(value=12)
-        # Bez zaokraglania do wielokrotnosci 4 - wczesniej wczytanie interwalu 11
-        # cicho zmienialo go przy zapisie na 8.
-        self.interval_scale = ttk.Scale(self.window, from_=4, to=300, orient='horizontal',
-                                        command=lambda v: self.interval_var.set(int(round(float(v)))))
+        self.interval_scale = ttk.Scale(self.window, from_=INTERVAL_MIN, to=INTERVAL_MAX,
+                                        orient='horizontal', command=self._on_interval_move)
         self.interval_scale.place(x=140, y=y, width=520)
         # Show current value label
         self.interval_value_label = ttk.Label(self.window, textvariable=self.interval_var)
@@ -310,6 +331,25 @@ class ConfigEditor:
             'landscape', self.landscape_dropdown_var.get(), self.landscape_history,
             LANDSCAPE_HISTORY, self.landscape_dropdown, self.landscape_dropdown_var)
 
+    def _on_interval_move(self, value):
+        """Suwak interwalu porusza sie skokowo co INTERVAL_STEP sekund."""
+        if self._interval_snapping:
+            return
+
+        snapped = snap_interval(value)
+        self.interval_var.set(snapped)
+
+        try:
+            if abs(float(value) - snapped) > 0.01:
+                # Przyciagnij tez sam suwak, zeby uchwyt stal na wartosci ze skoku
+                self._interval_snapping = True
+                try:
+                    self.interval_scale.set(snapped)
+                finally:
+                    self._interval_snapping = False
+        except (TypeError, ValueError):
+            pass
+
     def _set_status(self, text, error=False):
         """Pokaz komunikat w oknie - w wersji EXE print nie ma gdzie trafic."""
         try:
@@ -343,10 +383,7 @@ class ConfigEditor:
 
         self.rotate_var.set(bool(cfg['inverse']))
 
-        try:
-            interval_val = int(cfg['interval'])
-        except (TypeError, ValueError):
-            interval_val = 30
+        interval_val = snap_interval(cfg['interval'])
         self.interval_var.set(interval_val)
         try:
             self.interval_scale.set(interval_val)
@@ -437,10 +474,7 @@ class ConfigEditor:
         section['shuffle'] = bool(self.random_var.get())
         section['scale_mode'] = self.scale_mode_var.get()
         section['show_time'] = bool(self.show_time_var.get())
-        try:
-            section['interval'] = int(self.interval_var.get())
-        except (TypeError, ValueError):
-            section['interval'] = 30
+        section['interval'] = snap_interval(self.interval_var.get())
 
         # Zapis atomowy, pod blokada wspoldzielona z glowna aplikacja
         if not _config_manager.save_config(cfg):
