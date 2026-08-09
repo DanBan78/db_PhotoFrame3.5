@@ -39,7 +39,7 @@ DEBUG_ENABLED = True
 CONFIG_PATH = config_path()
 PORTRAIT_HISTORY = portrait_history_path()
 LANDSCAPE_HISTORY = landscape_history_path()
-HISTORY_LIMIT = 5
+HISTORY_LIMIT = 8
 
 # Opisy trybow skalowania widoczne w oknie
 SCALE_MODE_LABELS = {
@@ -106,16 +106,25 @@ def load_history(path: Path) -> list[str]:
 
 
 def save_history(path: Path, entries: list[str]):
+    """Zapisz historie folderow: najnowszy wpis jako pierwszy w pliku.
+
+    Przy przepelnionej liscie wypada NAJSTARSZY wpis, czyli ostatni.
+    Wczesniejsza wersja obcinala liste od zlej strony - po odwroceniu brala
+    pierwsze HISTORY_LIMIT pozycji, czyli wlasnie najstarsze - wiec gdy lista
+    byla pelna, nowo wybrany folder byl po cichu gubiony.
+    """
     try:
         ensure_tools_dir()
-        # Keep unique, last-most-recent at end
-        unique = []
-        for e in reversed(entries):
-            if e not in unique:
-                unique.append(e)
-        unique = list(reversed(unique))[:HISTORY_LIMIT]
+        # Kolejnosc wejsciowa: najnowszy na poczatku. Duplikaty usuwamy zachowujac
+        # pierwsze (czyli najswiezsze) wystapienie.
+        newest_first = []
+        for e in entries:
+            if e and e not in newest_first:
+                newest_first.append(e)
+
+        newest_first = newest_first[:HISTORY_LIMIT]
         with path.open("w", encoding="utf-8") as f:
-            for e in unique:
+            for e in newest_first:
                 f.write(e + "\n")
     except Exception:
         pass
@@ -277,6 +286,7 @@ class ConfigEditor:
         if folder in history:
             history.remove(folder)
         history.insert(0, folder)
+        del history[HISTORY_LIMIT:]
         dropdown.configure(values=history)
         save_history(history_file, history)
         dropdown_var.set(history[0])
@@ -440,10 +450,12 @@ class ConfigEditor:
     def select_portrait(self, folder):
         if folder and os.path.exists(folder):
             self.portrait_dropdown_var.set(folder)
-            # update history
+            # Nowo wybrany folder na poczatek listy - tak samo jak robi to SET.
+            # Wczesniej trafial na koniec, wiec przy pelnej liscie wypadal pierwszy.
             if folder in self.portrait_history:
                 self.portrait_history.remove(folder)
-            self.portrait_history.append(folder)
+            self.portrait_history.insert(0, folder)
+            del self.portrait_history[HISTORY_LIMIT:]
             self.portrait_dropdown.configure(values=self.portrait_history)
             save_history(PORTRAIT_HISTORY, self.portrait_history)
 
@@ -452,7 +464,8 @@ class ConfigEditor:
             self.landscape_dropdown_var.set(folder)
             if folder in self.landscape_history:
                 self.landscape_history.remove(folder)
-            self.landscape_history.append(folder)
+            self.landscape_history.insert(0, folder)
+            del self.landscape_history[HISTORY_LIMIT:]
             self.landscape_dropdown.configure(values=self.landscape_history)
             save_history(LANDSCAPE_HISTORY, self.landscape_history)
 
