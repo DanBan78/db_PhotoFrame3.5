@@ -274,7 +274,7 @@ class PhotoFrame:
             if self.display and hasattr(self.display, 'apply_config'):
                 self.display.apply_config(self.config)
         except Exception as e:
-            print(f"Error applying config to display: {e}")
+            debug_print(f"Error applying config to display: {e}", 'error')
         
         # Reload images and show immediately (use current config already set above)
         if self.running:

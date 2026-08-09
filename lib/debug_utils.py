@@ -1,10 +1,11 @@
 """
 Shared debug utilities for PhotoFrame application
 """
-import sys
+import logging
 import yaml
 from pathlib import Path
 
+from .log import logger as _file_logger
 from .paths import config_path as _config_path
 
 class DebugConfig:
@@ -46,24 +47,20 @@ class DebugConfig:
             return
             
         if level == 'error' or cls.DEBUG_LEVEL in ['info', 'debug']:
-            cls._emit(message)
+            cls._emit(message, level)
 
     @staticmethod
-    def _emit(message):
-        """Wypisz komunikat bez ryzyka wywrocenia aplikacji.
+    def _emit(message, level='info'):
+        """Zapisz komunikat do log.log (i na konsole, jesli jakas jest).
 
-        Polska konsola Windows uzywa cp1250, ktore nie potrafi zakodowac emoji
-        obecnych w komunikatach - goly print() rzucal UnicodeEncodeError prosto
-        z callbacku zasobnika i przerywal obsluge klikniecia.
+        W buildzie --noconsole sys.stdout nie istnieje, wiec dotychczasowe
+        print() przepadalo bez sladu - kazdy blad aplikacji byl niewidoczny.
+        Logowanie do pliku jest tez odporne na konsole cp1250, ktora nie
+        potrafi zakodowac emoji z komunikatow (print rzucal UnicodeEncodeError
+        prosto z callbacku zasobnika).
         """
         try:
-            print(message)
-        except UnicodeEncodeError:
-            try:
-                encoding = getattr(sys.stdout, 'encoding', None) or 'ascii'
-                print(str(message).encode(encoding, 'replace').decode(encoding, 'replace'))
-            except Exception:
-                pass
+            _file_logger.log(logging.ERROR if level == 'error' else logging.INFO, message)
         except Exception:
             pass
 

@@ -59,7 +59,7 @@ class PhotoFrameApp:
             # Initialize display
             self.display = LCDDisplay()
             if not self.display.initialize():
-                print("❌ Failed to initialize display")
+                debug_print("❌ Failed to initialize display", 'error')
                 return False
 
             # Initialize photoframe and attach display
@@ -69,7 +69,7 @@ class PhotoFrameApp:
             debug_print("✅ Initialization complete")
             return True
         except Exception as e:
-            print(f"Initialization failed: {e}")
+            debug_print(f"Initialization failed: {e}", 'error')
             return False
     
     def _initialize_default_folders(self):
@@ -205,7 +205,7 @@ class PhotoFrameApp:
         if self._config_process:
             try:
                 if self._config_process.poll() is None:
-                    print("⚙️ Configuration already open")
+                    debug_print("⚙️ Configuration already open")
                     return
                 else:
                     # Process finished, clean up
@@ -218,7 +218,7 @@ class PhotoFrameApp:
         if not self._config_open:
             threading.Thread(target=self._open_config_action, daemon=True).start()
         else:
-            print("⚙️ Configuration already open")
+            debug_print("⚙️ Configuration already open")
 
     @staticmethod
     def _editor_command():
@@ -271,22 +271,9 @@ class PhotoFrameApp:
                 debug_print(f"Reload config: {'OK' if ok else 'Failed'}")
                 # Do not refresh configuration editor - it was closed by user
             else:
-                print("No photoframe instance to reload config")
+                debug_print("No photoframe instance to reload config")
         except Exception as e:
-            print(f"Error reloading config: {e}")
-
-    def _refresh_config_editor(self):
-        """Refresh the configuration editor to reflect updated settings."""
-        try:
-            root = str(app_dir())
-            local_editor = os.path.join(root, 'tools', 'config_editor.py')
-            if os.path.exists(local_editor):
-                subprocess.Popen([sys.executable, local_editor, '--refresh'], cwd=root)
-                print("⚙️ Configuration editor refreshed")
-            else:
-                print("⚠️ Configuration editor not found")
-        except Exception as e:
-            print(f"❌ Failed to refresh configuration editor: {e}")
+            debug_print(f"Error reloading config: {e}", 'error')
 
     def switch_to_default_folder(self, icon=None, item=None):
         """Set default folder (first from history) for current orientation - ON CLICK SYSTRAY"""
@@ -297,12 +284,12 @@ class PhotoFrameApp:
             
             # Check if lock is active - if yes, exit
             if self.photoframe._reload_lock:
-                print("⏱️ Reload already in progress, ignoring click")
+                debug_print("⏱️ Reload already in progress, ignoring click")
                 return
             
             # Set lock to block slideshow loop
             self.photoframe._reload_lock = True
-            print("🔒 Lock set - blocking slideshow loop")
+            debug_print("🔒 Lock set - blocking slideshow loop")
             
             try:
                 # Get current orientation from config
@@ -334,7 +321,7 @@ class PhotoFrameApp:
                     debug_print(f"Default folder does not exist: {default_folder}")
                     return
                 
-                print(f"🔄 Setting default {current_orientation} folder: {default_folder}")
+                debug_print(f"🔄 Setting default {current_orientation} folder: {default_folder}")
                 
                 # Update config with default folders from history (first paths)
                 if current_orientation.startswith('p'):  # portrait
@@ -349,9 +336,9 @@ class PhotoFrameApp:
                 # Save config
                 from lib.config_manager import config_manager
                 if config_manager.save_config(config):
-                    print(f"✅ Config saved with default folder")
+                    debug_print(f"✅ Config saved with default folder")
                 else:
-                    print(f"❌ Failed to save config")
+                    debug_print(f"❌ Failed to save config", 'error')
                     return
                 
                 # Update photoframe's in-memory config
@@ -363,20 +350,20 @@ class PhotoFrameApp:
                     self.photoframe.current_index = 0
                     # Load first image immediately
                     self.photoframe.show_current_image_now()
-                    print(f"✅ Loaded {len(self.photoframe.current_images)} images from default folder")
+                    debug_print(f"✅ Loaded {len(self.photoframe.current_images)} images from default folder")
                     
             finally:
                 # Release lock after 1 second
                 def release_lock():
                     time.sleep(1.0)
                     self.photoframe._reload_lock = False
-                    print("🔓 Lock released after 1 second")
+                    debug_print("🔓 Lock released after 1 second")
                 
                 threading.Thread(target=release_lock, daemon=True).start()
             
         except Exception as e:
             debug_print(f"❌ Error switching to default folder: {e}", 'error')
-            print(f"❌ Error: {e}")
+            debug_print(f"❌ Error: {e}", 'error')
             # Ensure lock is released on error
             if self.photoframe:
                 self.photoframe._reload_lock = False
@@ -384,10 +371,10 @@ class PhotoFrameApp:
     def start_slideshow(self):
         """Start the photo slideshow"""
         if not self.photoframe:
-            print("❌ No photoframe instance available")
+            debug_print("❌ No photoframe instance available", 'error')
             return False
         if not self.photoframe.start_slideshow():
-            print("❌ Failed to start slideshow")
+            debug_print("❌ Failed to start slideshow", 'error')
             return False
         return True
     
@@ -423,7 +410,7 @@ class PhotoFrameApp:
     
     def signal_handler(self, signum, frame):
         """Handle system signals"""
-        print(f"📡 Received signal {signum}")
+        debug_print(f"📡 Received signal {signum}")
         self.shutdown()
     
     def run(self):
@@ -458,7 +445,7 @@ class PhotoFrameApp:
             while self.running:
                 time.sleep(1)
         except KeyboardInterrupt:
-            print("\n⌨️  Keyboard interrupt received")
+            debug_print("\n⌨️  Keyboard interrupt received")
             self.shutdown()
 
         return True
@@ -468,7 +455,7 @@ class PhotoFrameApp:
         try:
             # Ensure pystray and PIL Image are available
             if 'pystray' not in globals() or 'Image' not in globals():
-                print("⚠️  pystray or PIL not available; skipping tray icon")
+                debug_print("⚠️  pystray or PIL not available; skipping tray icon", 'error')
                 return
 
             icon_path = str(resource_path('res', 'icons', 'photoframe-photos', '64.png'))
@@ -499,7 +486,7 @@ class PhotoFrameApp:
                     self.tray_icon.title = 'Photo Frame - Running'
                     self.tray_icon.menu = menu
                 except Exception as e2:
-                    print(f"⚠️  Failed to create tray icon object: {e} / {e2}")
+                    debug_print(f"⚠️  Failed to create tray icon object: {e} / {e2}", 'error')
                     self.tray_icon = None
 
             if not self.tray_icon:
@@ -515,9 +502,9 @@ class PhotoFrameApp:
                     self.tray_thread.start()
                     debug_print("✅ Tray icon started (thread)")
             except Exception as e:
-                print(f"⚠️  Tray icon run failed: {e}")
+                debug_print(f"⚠️  Tray icon run failed: {e}", 'error')
         except Exception as e:
-            print(f"⚠️  Tray icon setup failed: {e}")
+            debug_print(f"⚠️  Tray icon setup failed: {e}", 'error')
 
 
 def main():

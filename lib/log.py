@@ -29,12 +29,34 @@ from .paths import log_path
 # use current locale for date/time formatting in logs
 locale.setlocale(locale.LC_ALL, '')
 
+_log_file = log_path()
+
+# Starsze wersje pisaly log w kodowaniu konsoli (cp1250). Mieszanie go z
+# nowymi wpisami UTF-8 daje plik, ktorego nie da sie odczytac w calosci -
+# jednorazowo odkladamy go na bok.
+try:
+    if _log_file.exists():
+        _log_file.read_bytes().decode('utf-8')
+except UnicodeDecodeError:
+    try:
+        _log_file.replace(_log_file.with_name(_log_file.name + '.old'))
+    except OSError:
+        pass
+except OSError:
+    pass
+
 _handlers = [
     # Log in textfile max 1MB - obok EXE / w katalogu projektu, nie w CWD
-    RotatingFileHandler(str(log_path()), maxBytes=1000000, backupCount=0, encoding='utf-8'),
+    RotatingFileHandler(str(_log_file), maxBytes=1000000, backupCount=0, encoding='utf-8'),
 ]
 if sys.stderr is not None:
     # W buildzie okienkowym (--noconsole) stderr nie istnieje
+    try:
+        # Polska konsola to cp1250 - emoji w komunikatach powodowaly
+        # UnicodeEncodeError. Zastepujemy nieobslugiwane znaki zamiast wybuchac.
+        sys.stderr.reconfigure(errors='replace')
+    except Exception:
+        pass
     _handlers.append(logging.StreamHandler())
 
 logging.basicConfig(  # format='%(asctime)s [%(levelname)s] %(message)s in %(pathname)s:%(lineno)d',
