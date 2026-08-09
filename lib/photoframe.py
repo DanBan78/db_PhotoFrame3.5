@@ -11,7 +11,7 @@ from pathlib import Path
 
 # Import shared utilities
 from .debug_utils import debug_print
-from .config_manager import config_manager
+from .config_manager import config_manager, settings, SECTION
 from .constants import *
 
 class PhotoFrame:
@@ -19,9 +19,7 @@ class PhotoFrame:
         # Load initial configuration using config manager
         config_manager.config_path = config_path
         self.config = config_manager.load_config()
-        # Ensure photos section exists
-        if 'photos' not in self.config:
-            self.config['photos'] = {}
+        self.config.setdefault(SECTION, {})
         self.display = None
         self.running = False
         self.current_images = []
@@ -74,7 +72,7 @@ class PhotoFrame:
         except Exception as e:
             debug_print(f"Error applying config to display: {e}", 'error')
 
-        # Reload image list according to new photos.orientation
+        # Reload image list according to new orientation_portrait
         if self.running:
             self.current_images = self.load_images(use_current_config=True)
             self.current_index = 0
@@ -96,26 +94,16 @@ class PhotoFrame:
         else:
             fresh_cfg = config_manager.load_config(force_reload=True, silent=True)
         
-        photos_cfg = fresh_cfg.get('photos', {}) if isinstance(fresh_cfg, dict) else {}
-        config_cfg = fresh_cfg.get('config', {}) if isinstance(fresh_cfg, dict) else {}
-
-        # Determine orientation (prefer photos.orientation, fallback to legacy key)
-        orientation = photos_cfg.get('orientation')
-        if orientation is None:
-            orientation = config_cfg.get('PHOTO_FRAME_ORIENTATION', 'portrait')
-        orientation = str(orientation).lower()
-
-        # Choose folder explicitly: portrait->portrait_folder, landscape->landscape_folder
-        if orientation.startswith('p'):
-            folder = photos_cfg.get('portrait_folder') or config_cfg.get('PHOTO_FRAME_FOLDER_PORTRAIT') or photos_cfg.get('portrait')
-        else:
-            folder = photos_cfg.get('landscape_folder') or config_cfg.get('PHOTO_FRAME_FOLDER_LANDSCAPE') or photos_cfg.get('landscape')
+        cfg = settings(fresh_cfg)
+        portrait = bool(cfg['orientation_portrait'])
+        orientation = 'portrait' if portrait else 'landscape'
+        folder = cfg['active_portrait_folder'] if portrait else cfg['active_landscape_folder']
 
         # Update in-memory config to the freshly read config so subsequent flows use current values
         self.config = fresh_cfg
         
         if not folder:
-            debug_print("No image folder configured (portrait_folder/landscape_folder missing)", 'error')
+            debug_print(f"Brak skonfigurowanego folderu (active_{orientation}_folder)", 'error')
             return []
 
         if not os.path.exists(folder):
@@ -130,8 +118,11 @@ class PhotoFrame:
             if file_path.suffix.lower() in image_extensions:
                 images.append(str(file_path))
         
-        # Shuffle for random order
-        random.shuffle(images)
+        # Kolejnosc wyswietlania: losowa albo alfabetyczna wg nazwy pliku
+        if cfg['shuffle']:
+            random.shuffle(images)
+        else:
+            images.sort(key=lambda p: os.path.basename(p).lower())
 
         debug_print(f"Loaded {len(images)} images from {folder} (orientation={orientation})")
         return images
@@ -179,15 +170,15 @@ class PhotoFrame:
             try:
                 fresh_cfg = config_manager.load_config(force_reload=True, silent=True)
                 if fresh_cfg:
-                    # Check if relevant config changed (orientation or folders)
-                    config_changed = False
-                    if self.config.get('photos', {}).get('orientation') != fresh_cfg.get('photos', {}).get('orientation'):
-                        config_changed = True
-                    if self.config.get('photos', {}).get('portrait_folder') != fresh_cfg.get('photos', {}).get('portrait_folder'):
-                        config_changed = True
-                    if self.config.get('photos', {}).get('landscape_folder') != fresh_cfg.get('photos', {}).get('landscape_folder'):
-                        config_changed = True
-                    
+                    # Przeladowujemy liste zdjec tylko gdy zmienilo sie cos,
+                    # co na nia wplywa (orientacja, aktywne foldery, kolejnosc)
+                    current = settings(self.config)
+                    fresh = settings(fresh_cfg)
+                    watched = ('orientation_portrait', 'active_portrait_folder',
+                               'active_landscape_folder', 'shuffle')
+                    config_changed = any(current[k] != fresh[k] for k in watched)
+
+
                     # Only if config changed, apply it and reload images
                     if config_changed:
                         debug_print("📋 Config changed detected - reloading images")
@@ -217,8 +208,11 @@ class PhotoFrame:
             # Move to next image
             self.current_index = (self.current_index + 1) % len(self.current_images)
             
-            # Wait for interval - check both new and old config locations
-            interval = self.config.get('slideshow', {}).get('interval') or self.config.get('photos', {}).get('slideshow_interval', 30)
+            # Odczekaj zadany interwal przed nastepnym zdjeciem
+            try:
+                interval = max(1, int(settings(self.config)['interval']))
+            except (TypeError, ValueError):
+                interval = DEFAULT_SLIDESHOW_INTERVAL
             time.sleep(interval)
     
     def stop_slideshow(self):
@@ -244,13 +238,9 @@ class PhotoFrame:
             image_path = self.current_images[self.current_index]
             debug_print(f"Displaying: {os.path.basename(image_path)}")
             try:
-                # Get show_time from slideshow section (config editor saves it there)
-                show_time = self.config.get('slideshow', {}).get('show_time', True)
-                show_date = self.config.get('slideshow', {}).get('show_date', False)
                 self.display.display_image_with_overlay(
                     image_path,
-                    show_time=show_time,
-                    show_date=show_date
+                    show_time=bool(settings(self.config)['show_time'])
                 )
             except Exception as e:
                 debug_print(f"Error during immediate display: {e}", 'error')
@@ -272,10 +262,11 @@ class PhotoFrame:
     
     def switch_orientation(self):
         """Switch between portrait and landscape"""
-        current = self.config.get('photos', {}).get('orientation', 'landscape')
-        new_orientation = 'portrait' if current == 'landscape' else 'landscape'
-        self.config['photos']['orientation'] = new_orientation
-        
+        portrait = not bool(settings(self.config)['orientation_portrait'])
+        self.config.setdefault(SECTION, {})['orientation_portrait'] = portrait
+        new_orientation = 'portrait' if portrait else 'landscape'
+
+
         # Save to config file using config manager
         try:
             config_manager.save_config(self.config)

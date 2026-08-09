@@ -13,6 +13,7 @@ import threading
 # Import shared utilities
 from lib.debug_utils import debug_print
 from lib.constants import *
+from lib.config_manager import settings, SECTION
 from lib.paths import (
     app_dir,
     config_path,
@@ -81,49 +82,53 @@ class PhotoFrameApp:
             return False
     
     def _initialize_default_folders(self):
-        """Uzupełnij brakujące foldery w konfiguracji pierwszym wpisem z historii.
+        """Uzupelnij brakujace foldery w konfiguracji pierwszym wpisem z historii.
 
-        Świadomie NIE nadpisujemy folderów wybranych przez użytkownika w edytorze -
-        wcześniejsza wersja robiła to przy każdym starcie, więc ustawienia znikały
-        po restarcie aplikacji.
+        Swiadomie NIE nadpisujemy folderow wybranych przez uzytkownika -
+        wczesniejsza wersja robila to przy kazdym starcie, wiec ustawienia
+        znikaly po restarcie aplikacji.
         """
         try:
             from lib.config_manager import config_manager
 
-            def _read_history(path):
+            def _first_entry(path):
                 try:
                     if path.exists():
                         with path.open("r", encoding="utf-8") as f:
-                            return [line.strip() for line in f if line.strip()]
+                            for line in f:
+                                line = line.strip()
+                                if line:
+                                    return line
                 except OSError as e:
                     debug_print(f"Error reading history file {path}: {e}", 'error')
-                return []
-
-            portrait_history = _read_history(portrait_history_path())
-            landscape_history = _read_history(landscape_history_path())
+                return ''
 
             cfg = config_manager.load_config(force_reload=True)
-            cfg.setdefault('config', {})
-            cfg.setdefault('photos', {})
-
-            def _needs_default(folder):
-                return not folder or not os.path.isdir(str(folder))
-
+            section = cfg.setdefault(SECTION, {})
+            values = settings(cfg)
             changed = False
 
-            if portrait_history and _needs_default(cfg['photos'].get('portrait_folder')):
-                cfg['photos']['portrait_folder'] = portrait_history[0]
-                cfg['config']['PHOTO_FRAME_FOLDER_PORTRAIT'] = portrait_history[0]
-                cfg['config']['PORTRAIT_HISTORY_LINE'] = 0
-                changed = True
-                debug_print(f"📁 Default portrait folder: {portrait_history[0]}")
+            def _missing(folder):
+                return not folder or not os.path.isdir(str(folder))
 
-            if landscape_history and _needs_default(cfg['photos'].get('landscape_folder')):
-                cfg['photos']['landscape_folder'] = landscape_history[0]
-                cfg['config']['PHOTO_FRAME_FOLDER_LANDSCAPE'] = landscape_history[0]
-                cfg['config']['LANDSCAPE_HISTORY_LINE'] = 0
-                changed = True
-                debug_print(f"📁 Default landscape folder: {landscape_history[0]}")
+            for orientation, history_path in (('portrait', portrait_history_path()),
+                                              ('landscape', landscape_history_path())):
+                default_key = f'default_{orientation}_folder'
+                active_key = f'active_{orientation}_folder'
+
+                if _missing(values[default_key]):
+                    candidate = _first_entry(history_path) or values[active_key]
+                    if candidate and not _missing(candidate):
+                        section[default_key] = candidate
+                        values[default_key] = candidate
+                        changed = True
+                        debug_print(f"📁 Folder domyslny ({orientation}): {candidate}")
+
+                if _missing(values[active_key]) and not _missing(values[default_key]):
+                    section[active_key] = values[default_key]
+                    values[active_key] = values[default_key]
+                    changed = True
+                    debug_print(f"📁 Folder aktywny ({orientation}): {values[default_key]}")
 
             if changed:
                 config_manager.save_config(cfg)
@@ -352,7 +357,7 @@ class PhotoFrameApp:
             debug_print(f"Error reloading config: {e}", 'error')
 
     def switch_to_default_folder(self, icon=None, item=None):
-        """Set default folder (first from history) for current orientation - ON CLICK SYSTRAY"""
+        """Ustaw folder domyslny biezacej orientacji jako aktywny (podwojny klik)."""
         try:
             if not self.photoframe:
                 debug_print("No photoframe instance available")
@@ -368,53 +373,36 @@ class PhotoFrameApp:
             debug_print("🔒 Lock set - blocking slideshow loop")
             
             try:
-                # Get current orientation from config
                 config = self.photoframe.load_config()
-                current_orientation = config.get('photos', {}).get('orientation', 'portrait').lower()
-                
-                # Read appropriate history file - ALWAYS use first line (default)
-                if current_orientation.startswith('p'):  # portrait
-                    history_file = portrait_history_path()
-                else:  # landscape
-                    history_file = landscape_history_path()
-                
-                if not history_file.exists():
-                    debug_print(f"History file not found: {history_file}")
+                values = settings(config)
+                portrait = bool(values['orientation_portrait'])
+                orientation = 'portrait' if portrait else 'landscape'
+
+                default_key = f'default_{orientation}_folder'
+                active_key = f'active_{orientation}_folder'
+                default_folder = values[default_key]
+
+                if not default_folder:
+                    debug_print(f"Brak folderu domyslnego w konfiguracji ({default_key})", 'error')
                     return
-                    
-                # Read first line (default folder)
-                with open(history_file, 'r', encoding='utf-8') as f:
-                    lines = [line.strip() for line in f.readlines() if line.strip()]
-                    
-                if not lines:
-                    debug_print(f"No folders in history file: {history_file}")
+
+                if not os.path.isdir(default_folder):
+                    debug_print(f"Folder domyslny nie istnieje: {default_folder}", 'error')
                     return
-                    
-                # ALWAYS use first folder from history (index 0)
-                default_folder = lines[0]
-                
-                if not os.path.exists(default_folder):
-                    debug_print(f"Default folder does not exist: {default_folder}")
+
+                if values[active_key] == default_folder:
+                    debug_print(f"Folder domyslny ({orientation}) jest juz aktywny: {default_folder}")
                     return
-                
-                debug_print(f"🔄 Setting default {current_orientation} folder: {default_folder}")
-                
-                # Update config with default folders from history (first paths)
-                if current_orientation.startswith('p'):  # portrait
-                    config['photos']['portrait_folder'] = default_folder
-                    config['config']['PHOTO_FRAME_FOLDER_PORTRAIT'] = default_folder
-                    config['config']['PORTRAIT_HISTORY_LINE'] = 0
-                else:  # landscape
-                    config['photos']['landscape_folder'] = default_folder
-                    config['config']['PHOTO_FRAME_FOLDER_LANDSCAPE'] = default_folder
-                    config['config']['LANDSCAPE_HISTORY_LINE'] = 0
-                
-                # Save config
+
+                debug_print(f"🔄 Przelaczam na folder domyslny ({orientation}): {default_folder}")
+
+                config.setdefault(SECTION, {})[active_key] = default_folder
+
                 from lib.config_manager import config_manager
                 if config_manager.save_config(config):
-                    debug_print(f"✅ Config saved with default folder")
+                    debug_print("✅ Config saved with default folder")
                 else:
-                    debug_print(f"❌ Failed to save config", 'error')
+                    debug_print("❌ Failed to save config", 'error')
                     return
                 
                 # Update photoframe's in-memory config

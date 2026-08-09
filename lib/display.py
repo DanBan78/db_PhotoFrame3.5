@@ -5,65 +5,36 @@ Clean implementation without system monitor dependencies
 
 import os
 import time
-import yaml
-from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from lib.lcd import lcd_comm_rev_a
 
 # Import shared utilities
 from .debug_utils import debug_print
+from .config_manager import config_manager, settings
 from .constants import *
-from .paths import config_path as _config_path
 
 class LCDDisplay:
-    def __init__(self, serial_port="COM3", brightness=85):
-        self.serial_port = serial_port
-        self.brightness = brightness
+    def __init__(self, serial_port=None, brightness=None):
+        """Argumenty nadpisuja wartosci z konfiguracji (przydatne w testach)."""
         # default physical screen size for portrait device
         self.width = DEFAULT_LCD_WIDTH
         self.height = DEFAULT_LCD_HEIGHT
         self.lcd = None
-        # load photo-frame orientation settings from config.yaml if available
-        # Prefer an external config file (next to the EXE or working directory)
+        self.frame_orientation = ORIENTATION_PORTRAIT
+        self.inverse = False
+        self.scale_mode = 'fit'
+
+        cfg = settings(config_manager.load_config())
+        self.serial_port = serial_port or cfg['com_port'] or DEFAULT_COM_PORT
         try:
-            cfg = {}
-            # Jedna, bezwzględna lokalizacja configu - niezależna od katalogu roboczego
-            # i od tego, czy działamy ze źródeł czy z EXE (patrz lib/paths.py).
-            cfg_path = str(_config_path())
+            self.brightness = int(brightness if brightness is not None else cfg['brightness'])
+        except (TypeError, ValueError):
+            self.brightness = 85
 
-            if cfg_path and os.path.exists(cfg_path):
-                try:
-                    with open(cfg_path, 'r', encoding='utf-8') as f:
-                        cfg = yaml.safe_load(f) or {}
-                    debug_print(f"Loaded config from: {cfg_path}")
-                except (FileNotFoundError, yaml.YAMLError, PermissionError) as e:
-                    debug_print(f"Failed to load config '{cfg_path}': {e}", 'error')
-                except Exception as e:
-                    debug_print(f"Unexpected error loading config '{cfg_path}': {e}", 'error')
-                    cfg = {}
-            else:
-                cfg = {}
-
-            # prefer photos.orientation (used by PhotoFrame) if present, otherwise fallback to config.PHOTO_FRAME_ORIENTATION
-            photos_cfg = cfg.get('photos', {})
-            config_cfg = cfg.get('config', {})
-            orientation = photos_cfg.get('orientation') if photos_cfg.get('orientation') is not None else config_cfg.get('PHOTO_FRAME_ORIENTATION', 'Portrait')
-            inverse = config_cfg.get('PHOTO_FRAME_INVERSE', False)
-            # Normalize values
-            orientation = str(orientation).capitalize()
-            self.frame_orientation = orientation if orientation in ('Portrait', 'Landscape') else 'Portrait'
-            self.inverse = bool(inverse)
-        except Exception:
-            self.frame_orientation = 'Portrait'
-            self.inverse = False
-
-        # Adjust width/height according to frame orientation
-        if self.frame_orientation == 'Portrait':
-            self.width, self.height = 320, 480
-        else:
-            self.width, self.height = 480, 320
-        # Debug info
-        debug_print(f"Display init => frame_orientation={self.frame_orientation}, inverse={self.inverse}, target={self.width}x{self.height}")
+        self.apply_config(config_manager.load_config())
+        debug_print(f"Display init => port={self.serial_port}, brightness={self.brightness}, "
+                    f"frame_orientation={self.frame_orientation}, inverse={self.inverse}, "
+                    f"scale_mode={self.scale_mode}, target={self.width}x{self.height}")
         
     def initialize(self):
         """Initialize LCD connection"""
@@ -148,13 +119,11 @@ class LCDDisplay:
                 # Ostateczny fallback
                 return ImageFont.load_default(), base_font_size
     
-    def _prepare_overlay_texts(self, show_time, show_date):
+    def _prepare_overlay_texts(self, show_time):
         """Prepare text content for overlay"""
         texts = []
         if show_time:
-            current_time = time.strftime("%H:%M")
-            texts.append(current_time)
-        # Date functionality removed per user request
+            texts.append(time.strftime("%H:%M"))
         return texts
     
     def _calculate_text_metrics(self, texts, font, draw):
@@ -307,41 +276,28 @@ class LCDDisplay:
             except (FileNotFoundError, PermissionError, OSError) as e:
                 debug_print(f"Could not remove temp file: {e}", 'debug')
 
-    def display_image_with_overlay(self, image_path, show_time=True, show_date=True):
-        """Display image with time/date overlay"""
+    def display_image_with_overlay(self, image_path, show_time=True):
+        """Display image with optional clock overlay"""
         if not self.lcd:
             return False
-            
+
         try:
-            # Load and prepare image
+            # _prepare_image_for_display zwraca juz obraz w rozmiarze fizycznego
+            # ekranu, wiec nie ma tu ponownego skalowania (ktore wczesniej
+            # znieksztalcalo kadr w trybie poziomym).
             image = Image.open(image_path)
             image = self._prepare_image_for_display(image)
-            
-            # Ensure correct size before overlay
-            try:
-                if self.lcd and hasattr(self.lcd, 'get_width') and hasattr(self.lcd, 'get_height'):
-                    lcd_w, lcd_h = self.lcd.get_width(), self.lcd.get_height()
-                else:
-                    lcd_w, lcd_h = self.width, self.height
-            except Exception:
-                lcd_w, lcd_h = self.width, self.height
-            
-            if image.size != (lcd_w, lcd_h):
-                debug_print(f"display_image_with_overlay: resizing image from {image.size} to LCD target {(lcd_w,lcd_h)} before overlay")
-                image = image.resize((lcd_w, lcd_h), Image.Resampling.LANCZOS)
-            
-            # Add overlay if requested
-            if show_time or show_date:
-                image = self._add_text_overlay(image, show_time, show_date)
+
+            if show_time:
+                image = self._add_text_overlay(image, show_time)
                 return self._send_image_to_lcd(image, with_overlay=True)
-            else:
-                return self._send_image_to_lcd(image, with_overlay=False)
-            
+            return self._send_image_to_lcd(image, with_overlay=False)
+
         except Exception as e:
             debug_print(f"Error displaying image with overlay: {e}", 'error')
             return False
-    
-    def _add_text_overlay(self, image, show_time, show_date):
+
+    def _add_text_overlay(self, image, show_time):
         """Add text overlay to image"""
         img_w, img_h = image.size
         
@@ -354,7 +310,7 @@ class LCDDisplay:
         
         # Prepare font and text
         font, base_font_size = self._create_overlay_font(img_w, img_h, is_landscape)
-        texts = self._prepare_overlay_texts(show_time, show_date)
+        texts = self._prepare_overlay_texts(show_time)
         
         if not texts:
             return image
@@ -408,112 +364,94 @@ class LCDDisplay:
                 debug_print(f"Error clearing screen: {e}", 'error')
 
     def apply_config(self, cfg: dict):
-        """Apply configuration at runtime (update orientation and inverse)."""
+        """Apply configuration at runtime (orientation, inverse, scale mode)."""
         try:
-            photos_cfg = cfg.get('photos', {}) if isinstance(cfg, dict) else {}
-            config_cfg = cfg.get('config', {}) if isinstance(cfg, dict) else {}
-            orientation = photos_cfg.get('orientation') if photos_cfg.get('orientation') is not None else config_cfg.get('PHOTO_FRAME_ORIENTATION', 'Portrait')
-            inverse = config_cfg.get('PHOTO_FRAME_INVERSE', False)
-            orientation = str(orientation).capitalize()
-            self.frame_orientation = orientation if orientation in ('Portrait', 'Landscape') else 'Portrait'
-            self.inverse = bool(inverse)
+            values = settings(cfg)
+            self.frame_orientation = (ORIENTATION_PORTRAIT if values['orientation_portrait']
+                                      else ORIENTATION_LANDSCAPE)
+            self.inverse = bool(values['inverse'])
+            self.scale_mode = values['scale_mode']
             # Adjust width/height according to frame orientation
             if self.frame_orientation == ORIENTATION_PORTRAIT:
                 self.width, self.height = DEFAULT_LCD_WIDTH, DEFAULT_LCD_HEIGHT
             else:
                 self.width, self.height = DEFAULT_LCD_HEIGHT, DEFAULT_LCD_WIDTH
-            debug_print(f"LCDDisplay.apply_config => frame_orientation={self.frame_orientation}, inverse={self.inverse}, target={self.width}x{self.height}")
+            debug_print(f"LCDDisplay.apply_config => frame_orientation={self.frame_orientation}, "
+                        f"inverse={self.inverse}, scale_mode={self.scale_mode}, "
+                        f"target={self.width}x{self.height}")
         except Exception as e:
             debug_print(f"apply_config error: {e}", 'error')
 
-    def _prepare_image_for_display(self, image: Image.Image) -> Image.Image:
-        """Rotate and resize image according to configured frame orientation and inverse flag.
+    def _scale_to_canvas(self, img: Image.Image, target_w: int, target_h: int) -> Image.Image:
+        """Wpasuj obraz w plotno target_w x target_h wedlug scale_mode.
 
-        Steps:
-        - If target orientation is Portrait and image is landscape -> rotate 90deg
-        - If target orientation is Landscape -> rotate 90deg (always) to match physical wiring
-        - Resize to (self.width, self.height)
-        - If inverse flag set -> rotate 180deg (final flip)
+        fit  - cale zdjecie widoczne, reszta plotna zostaje czarna (letterbox)
+        fill - zdjecie pokrywa cale plotno, nadmiar jest przyciety
+
+        Proporcje sa zachowane w obu trybach - zdjecie nigdy nie jest rozciagane.
+        """
+        src_w, src_h = img.size
+        if src_w <= 0 or src_h <= 0:
+            return img
+
+        if self.scale_mode == 'fill':
+            scale = max(target_w / src_w, target_h / src_h)
+        else:
+            scale = min(target_w / src_w, target_h / src_h)
+
+        new_w = max(1, round(src_w * scale))
+        new_h = max(1, round(src_h * scale))
+        resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+        canvas = Image.new('RGB', (target_w, target_h), (0, 0, 0))
+        offset_x = (target_w - new_w) // 2
+        offset_y = (target_h - new_h) // 2
+        # Przy 'fill' offsety sa ujemne - PIL sam przycina to, co wychodzi poza plotno
+        canvas.paste(resized, (offset_x, offset_y))
+        debug_print(f"_scale_to_canvas: {src_w}x{src_h} -> {new_w}x{new_h} "
+                    f"({self.scale_mode}) na {target_w}x{target_h}, offset ({offset_x},{offset_y})")
+        return canvas
+
+    def _prepare_image_for_display(self, image: Image.Image) -> Image.Image:
+        """Obroc i przeskaluj zdjecie pod fizyczny ekran.
+
+        Ekran jest fizycznie pionowy (320x480). Tryb poziomy uzyskujemy obracajac
+        obraz o 270 stopni, wiec plotno kompozycji ma wtedy wymiary 480x320,
+        a dopiero gotowa kompozycja jest obracana. Dzieki temu oba tryby uzywaja
+        tej samej logiki skalowania i zdjecie nigdzie nie jest rozciagane.
         """
         try:
             img = image
-            # Log source size before any transforms (rotation/resize)
-            try:
-                debug_print(f"_prepare_image_for_display: source size before transforms {img.size}")
-            except Exception:
-                pass
-            # Determine target size explicitly
-            if self.frame_orientation == 'Landscape':
-                target_w, target_h = 480, 320
-            else:
-                target_w, target_h = 320, 480
+            debug_print(f"_prepare_image_for_display: source size before transforms {img.size}")
 
-            # Decide whether we need to rotate source image to match target
-            rotate_degrees = 0
-            # Use fixed 90° rotation when the source orientation doesn't match target
-            if self.frame_orientation == 'Portrait':
+            landscape = self.frame_orientation == ORIENTATION_LANDSCAPE
+            if landscape:
+                canvas_w, canvas_h = DEFAULT_LCD_HEIGHT, DEFAULT_LCD_WIDTH   # 480x320
+            else:
+                canvas_w, canvas_h = DEFAULT_LCD_WIDTH, DEFAULT_LCD_HEIGHT   # 320x480
+                # Zdjecie poziome w ramce pionowej obracamy, zeby wykorzystac ekran
                 if img.width > img.height:
-                    rotate_degrees = 90
-            else:
-                # For Landscape frames, rotate 270° (equivalent to -90°)
-                # so landscape-folder images are oriented correctly on the display.
-                rotate_degrees = 270
+                    debug_print("_prepare_image_for_display: rotating 90deg to match portrait frame")
+                    img = img.rotate(90, expand=True)
 
-            if rotate_degrees:
-                try:
-                    debug_print(f"_prepare_image_for_display: rotating {rotate_degrees}deg to match frame")
-                    img = img.rotate(rotate_degrees, expand=True)
-                except Exception as e:
-                    debug_print(f"_prepare_image_for_display: rotation failed: {e}", 'error')
+            final = self._scale_to_canvas(img, canvas_w, canvas_h)
 
-            # For Landscape mode we want the image scaled to full portrait target (320x480)
-            # so that landscape-folder images appear the same as portrait ones.
+            if landscape:
+                # Kompozycja 480x320 -> fizyczne 320x480
+                final = final.rotate(270, expand=True)
+
+            if self.inverse:
+                debug_print("_prepare_image_for_display: applying 180deg inverse flip")
+                final = final.rotate(180)
+
+            debug_print(f"_prepare_image_for_display: final size {final.size}")
+            return final
+        except Exception as e:
+            debug_print(f"_prepare_image_for_display: error: {e}", 'error')
+            # Awaryjnie: proste dopasowanie do fizycznego rozmiaru ekranu
             try:
-                if self.frame_orientation == 'Landscape':
-                    debug_print(f"_prepare_image_for_display: force-resizing to {target_w}x{target_h} for landscape display")
-                    final = img.resize((target_w, target_h), Image.Resampling.LANCZOS)
-                    # Apply 180deg flip if device is inverted (after composing)
-                    if getattr(self, 'inverse', False):
-                        debug_print("_prepare_image_for_display: applying 180deg inverse flip")
-                        final = final.rotate(180)
-                    debug_print(f"_prepare_image_for_display: final size {final.size}")
-                    return final
-
-                # Fit image into target while preserving aspect ratio and center it (portrait/default)
-                src_w, src_h = img.size
-                scale = min(target_w / src_w, target_h / src_h)
-                new_w = max(1, int(src_w * scale))
-                new_h = max(1, int(src_h * scale))
-                debug_print(f"_prepare_image_for_display: resizing from {src_w}x{src_h} to {new_w}x{new_h} (target {target_w}x{target_h})")
-                img_resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-
-                # Create final canvas and paste centered
-                final = Image.new('RGB', (target_w, target_h), (0, 0, 0))
-                offset_x = (target_w - new_w) // 2
-                offset_y = (target_h - new_h) // 2
-                final.paste(img_resized, (offset_x, offset_y))
-
-                # Apply 180deg flip if device is inverted (after composing)
-                if getattr(self, 'inverse', False):
-                    debug_print("_prepare_image_for_display: applying 180deg inverse flip")
-                    final = final.rotate(180)
-
-                debug_print(f"_prepare_image_for_display: final size {final.size}, pasted at ({offset_x},{offset_y})")
-                return final
-            except Exception as e:
-                debug_print(f"_prepare_image_for_display: error during resize/compose: {e}", 'error')
-                # Fallback: simple resize to target
-                try:
-                    fallback = image.resize((target_w, target_h), Image.Resampling.LANCZOS)
-                    if getattr(self, 'inverse', False):
-                        fallback = fallback.rotate(180)
-                    return fallback
-                except Exception:
-                    return image
-        except Exception:
-            # On error, fallback to a safe resize without rotations
-            try:
-                return image.resize((self.width, self.height), Image.Resampling.LANCZOS)
+                return image.resize((DEFAULT_LCD_WIDTH, DEFAULT_LCD_HEIGHT),
+                                    Image.Resampling.LANCZOS)
             except Exception:
                 return image
     

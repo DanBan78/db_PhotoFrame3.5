@@ -1,6 +1,29 @@
 """
 Configuration Manager for PhotoFrame application.
 Provides centralized configuration loading, validation, and management.
+
+Format pliku (jedna plaska sekcja):
+
+    photo_frame:
+      com_port: COM3
+      debug_enabled: true
+      debug_level: info
+      show_time: false
+      brightness: 85
+      interval: 44
+      orientation_portrait: true
+      scale_mode: fit
+      inverse: false
+      shuffle: true
+      default_landscape_folder: C:/.Source/Ramka/poziome
+      default_portrait_folder: C:/.Source/Ramka/PionAI
+      active_landscape_folder: C:/.Source/Ramka/poziome
+      active_portrait_folder: C:/.Source/Ramka/PionAI
+
+default_* to folder, na ktory wraca podwojne klikniecie w ikone zasobnika,
+active_* to folder aktualnie wyswietlany. Starszy uklad (sekcje config/photos/
+slideshow/display/debug z podwojonymi kluczami) jest automatycznie migrowany
+przy pierwszym odczycie - patrz _migrate_legacy().
 """
 
 import yaml
@@ -9,7 +32,118 @@ import shutil
 import tempfile
 from lib.debug_utils import debug_print
 from lib.filelock import file_lock
-from lib.paths import config_path as _default_config_path
+from lib.paths import (
+    config_path as _default_config_path,
+    portrait_history_path,
+    landscape_history_path,
+)
+
+SECTION = 'photo_frame'
+
+# Tryby skalowania zdjecia do ekranu (proporcje zachowane w obu):
+#   fit  - cale zdjecie widoczne, wolne miejsce wypelniaja czarne pasy
+#   fill - zdjecie pokrywa caly ekran, nadmiar jest przyciety, obraz wysrodkowany
+SCALE_MODES = ('fit', 'fill')
+
+# Kolejnosc kluczy w zapisywanym pliku
+DEFAULTS = {
+    'com_port': 'COM3',
+    'debug_enabled': True,
+    'debug_level': 'info',
+    'show_time': False,
+    'brightness': 85,
+    'interval': 30,
+    'orientation_portrait': True,
+    'scale_mode': 'fit',
+    'inverse': False,
+    'shuffle': True,
+    'default_landscape_folder': '',
+    'default_portrait_folder': '',
+    'active_landscape_folder': '',
+    'active_portrait_folder': '',
+}
+
+
+def settings(config):
+    """Zwroc ustawienia z sekcji photo_frame uzupelnione o wartosci domyslne.
+
+    Dzieki temu kod czytajacy konfiguracje nigdy nie musi sprawdzac, czy klucz
+    istnieje, ani znac starego ukladu pliku.
+    """
+    values = dict(DEFAULTS)
+    if isinstance(config, dict):
+        section = config.get(SECTION)
+        if isinstance(section, dict):
+            values.update({k: v for k, v in section.items() if v is not None})
+    if values.get('scale_mode') not in SCALE_MODES:
+        values['scale_mode'] = DEFAULTS['scale_mode']
+    return values
+
+
+def _ordered(config):
+    """Uloz klucze sekcji photo_frame w stalej, czytelnej kolejnosci."""
+    if not isinstance(config, dict) or SECTION not in config:
+        return config
+    section = config[SECTION]
+    if not isinstance(section, dict):
+        return config
+    ordered = {k: section[k] for k in DEFAULTS if k in section}
+    ordered.update({k: v for k, v in section.items() if k not in ordered})
+    rest = {k: v for k, v in config.items() if k != SECTION}
+    return {SECTION: ordered, **rest}
+
+
+def _first_history_entry(path):
+    """Pierwszy wpis z pliku historii folderow (uzywany jako folder domyslny)."""
+    try:
+        if path.exists():
+            with path.open('r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        return line
+    except OSError:
+        pass
+    return ''
+
+
+def _migrate_legacy(old):
+    """Przepisz stary uklad (config/photos/slideshow/display/debug) na photo_frame."""
+    legacy = old.get('config', {}) if isinstance(old.get('config'), dict) else {}
+    photos = old.get('photos', {}) if isinstance(old.get('photos'), dict) else {}
+    slideshow = old.get('slideshow', {}) if isinstance(old.get('slideshow'), dict) else {}
+    display = old.get('display', {}) if isinstance(old.get('display'), dict) else {}
+    debug = old.get('debug', {}) if isinstance(old.get('debug'), dict) else {}
+
+    orientation = photos.get('orientation') or legacy.get('PHOTO_FRAME_ORIENTATION') or 'portrait'
+
+    active_portrait = photos.get('portrait_folder') or legacy.get('PHOTO_FRAME_FOLDER_PORTRAIT') or ''
+    active_landscape = photos.get('landscape_folder') or legacy.get('PHOTO_FRAME_FOLDER_LANDSCAPE') or ''
+
+    # Folder domyslny bral sie dotad z pierwszej linii pliku historii
+    default_portrait = _first_history_entry(portrait_history_path()) or active_portrait
+    default_landscape = _first_history_entry(landscape_history_path()) or active_landscape
+
+    values = dict(DEFAULTS)
+    values.update({
+        'com_port': legacy.get('COM_PORT') or DEFAULTS['com_port'],
+        'debug_enabled': bool(debug.get('enabled', DEFAULTS['debug_enabled'])),
+        'debug_level': debug.get('level') or DEFAULTS['debug_level'],
+        'show_time': bool(slideshow.get('show_time', DEFAULTS['show_time'])),
+        'brightness': display.get('brightness', DEFAULTS['brightness']),
+        'interval': slideshow.get('interval') or photos.get('slideshow_interval') or DEFAULTS['interval'],
+        'orientation_portrait': str(orientation).lower().startswith('p'),
+        # Stare PHOTO_FRAME_MAINTAIN_ASPECT_RATIO=false oznaczalo rozciaganie;
+        # najblizszym odpowiednikiem bez znieksztalcen jest wypelnienie ekranu.
+        'scale_mode': 'fit' if legacy.get('PHOTO_FRAME_MAINTAIN_ASPECT_RATIO', True) else 'fill',
+        'inverse': bool(legacy.get('PHOTO_FRAME_INVERSE', DEFAULTS['inverse'])),
+        'shuffle': bool(slideshow.get('shuffle', legacy.get('PHOTO_FRAME_RANDOM', DEFAULTS['shuffle']))),
+        'default_landscape_folder': default_landscape,
+        'default_portrait_folder': default_portrait,
+        'active_landscape_folder': active_landscape,
+        'active_portrait_folder': active_portrait,
+    })
+    return {SECTION: values}
 
 
 class ConfigManager:
@@ -72,11 +206,33 @@ class ConfigManager:
                     self._config = self.get_default_config()
                     return self._config.copy()
 
-                self._config = data
+                migrated = self._ensure_new_format(data)
+                self._config = migrated if migrated is not None else data
                 if not silent:
                     debug_print(f"Configuration loaded from {self.config_path}")
 
         return self._config.copy()  # Return a copy to prevent external modifications
+
+    def _ensure_new_format(self, data):
+        """Zmigruj stary uklad pliku na sekcje photo_frame i zapisz wynik.
+
+        Zwraca zmigrowana konfiguracje albo None, gdy plik jest juz w nowym
+        formacie. Wymaga trzymanej blokady pliku.
+        """
+        if not isinstance(data, dict) or SECTION in data:
+            return None
+
+        if not data:
+            new_config = self.get_default_config()
+        else:
+            new_config = _migrate_legacy(data)
+            debug_print("📋 Migracja konfiguracji do nowego formatu (photo_frame)")
+
+        try:
+            self._write_config_locked(new_config)
+        except OSError as e:
+            debug_print(f"Nie udalo sie zapisac zmigrowanej konfiguracji: {e}", 'error')
+        return new_config
 
     def _write_config_locked(self, config):
         """Atomowy zapis configu. Wymaga trzymanej blokady pliku."""
@@ -94,7 +250,9 @@ class ConfigManager:
         tmp_fd, tmp_path = tempfile.mkstemp(dir=directory, prefix='.config-', suffix='.tmp')
         try:
             with os.fdopen(tmp_fd, 'w', encoding='utf-8') as f:
-                yaml.safe_dump(config, f, default_flow_style=False, indent=2)
+                # sort_keys=False + uporzadkowana sekcja => plik czytelny dla czlowieka
+                yaml.safe_dump(_ordered(config), f, default_flow_style=False,
+                               indent=2, sort_keys=False, allow_unicode=True)
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(tmp_path, self.config_path)  # atomowa podmiana
@@ -127,96 +285,42 @@ class ConfigManager:
 
     def get_default_config(self):
         """Get default configuration values"""
-        return {
-            'slideshow': {
-                'interval': 30,
-                'show_time': True,
-                'show_date': False,
-                'shuffle': True
-            },
-            'photos': {
-                'portrait_folder': '',
-                'landscape_folder': '',
-                'orientation': 'Portrait'
-            },
-            'display': {
-                'brightness': 80,
-                'timeout': 0
-            },
-            'config': {
-                'PHOTO_FRAME_ORIENTATION': 'Portrait',
-                'PHOTO_FRAME_INVERSE': False,
-                'COM_PORT': 'COM3'
-            },
-            'debug': {
-                'enabled': True,
-                'level': 'info'
-            }
-        }
-    
-    def get_section(self, section_name, default=None):
-        """Get specific configuration section"""
-        config = self.load_config()
-        return config.get(section_name, default or {})
-    
-    def get_value(self, section, key, default=None):
-        """Get specific configuration value"""
-        section_config = self.get_section(section)
-        return section_config.get(key, default)
-    
-    def set_value(self, section, key, value):
-        """Set specific configuration value"""
-        config = self.load_config()
-        if section not in config:
-            config[section] = {}
-        config[section][key] = value
-        return self.save_config(config)
-    
-    def update_section(self, section_name, updates):
-        """Update an entire configuration section"""
-        config = self.load_config()
-        if section_name not in config:
-            config[section_name] = {}
-        config[section_name].update(updates)
-        return self.save_config(config)
-    
+        return {SECTION: dict(DEFAULTS)}
+
     def validate_config(self, config):
         """Validate configuration structure and values"""
         errors = []
-        
-        # Check required sections
-        required_sections = ['slideshow', 'photos', 'display', 'config', 'debug']
-        for section in required_sections:
-            if section not in config:
-                errors.append(f"Missing required section: {section}")
-        
-        # Validate slideshow settings
-        if 'slideshow' in config:
-            slideshow = config['slideshow']
-            if 'interval' in slideshow:
-                try:
-                    interval = int(slideshow['interval'])
-                    if interval < 1:
-                        errors.append("Slideshow interval must be at least 1 second")
-                except (ValueError, TypeError):
-                    errors.append("Slideshow interval must be a valid number")
-        
-        # Validate photo folders exist
-        if 'photos' in config:
-            photos = config['photos']
-            for folder_key in ['portrait_folder', 'landscape_folder']:
-                folder_path = photos.get(folder_key)
-                if folder_path and not os.path.exists(folder_path):
-                    errors.append(f"Photo folder does not exist: {folder_path}")
-        
-        # Validate orientation
-        valid_orientations = ['Portrait', 'Landscape']
-        if 'photos' in config and 'orientation' in config['photos']:
-            if config['photos']['orientation'] not in valid_orientations:
-                errors.append(f"Invalid orientation. Must be one of: {valid_orientations}")
-        
+
+        if SECTION not in config:
+            errors.append(f"Missing required section: {SECTION}")
+            return errors
+
+        cfg = config[SECTION]
+
+        try:
+            if int(cfg.get('interval', DEFAULTS['interval'])) < 1:
+                errors.append("interval must be at least 1 second")
+        except (ValueError, TypeError):
+            errors.append("interval must be a valid number")
+
+        try:
+            brightness = int(cfg.get('brightness', DEFAULTS['brightness']))
+            if not 0 <= brightness <= 100:
+                errors.append("brightness must be between 0 and 100")
+        except (ValueError, TypeError):
+            errors.append("brightness must be a valid number")
+
+        if cfg.get('scale_mode', DEFAULTS['scale_mode']) not in SCALE_MODES:
+            errors.append(f"scale_mode must be one of: {sorted(SCALE_MODES)}")
+
+        for key in ('active_portrait_folder', 'active_landscape_folder',
+                    'default_portrait_folder', 'default_landscape_folder'):
+            folder = cfg.get(key)
+            if folder and not os.path.isdir(str(folder)):
+                errors.append(f"Folder does not exist ({key}): {folder}")
+
         return errors
-    
+
     def is_valid_config_file(self, file_path=None):
         """Check if config file exists and is valid YAML"""
         path_to_check = file_path or self.config_path

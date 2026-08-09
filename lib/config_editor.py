@@ -24,7 +24,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import yaml
 
-from .config_manager import ConfigManager
+from .config_manager import ConfigManager, settings, SECTION, SCALE_MODES
 from .paths import (
     config_path,
     portrait_history_path,
@@ -40,6 +40,12 @@ PORTRAIT_HISTORY = portrait_history_path()
 LANDSCAPE_HISTORY = landscape_history_path()
 HISTORY_LIMIT = 5
 
+# Opisy trybow skalowania widoczne w oknie
+SCALE_MODE_LABELS = {
+    'fit': "Dopasuj (czarne pasy)",
+    'fill': "Wypelnij ekran (przytnij)",
+}
+
 # Wlasna instancja - zapis idzie przez ten sam atomowy mechanizm z blokada
 # miedzyprocesowa, ktorego uzywa glowna aplikacja.
 _config_manager = ConfigManager(str(CONFIG_PATH))
@@ -52,8 +58,7 @@ def load_debug_config():
         if CONFIG_PATH.exists():
             with CONFIG_PATH.open("r", encoding="utf-8") as f:
                 config = yaml.safe_load(f) or {}
-                debug_config = config.get('debug', {})
-                DEBUG_ENABLED = debug_config.get('enabled', True)
+            DEBUG_ENABLED = settings(config)['debug_enabled']
     except Exception:
         pass
 
@@ -103,7 +108,7 @@ class ConfigEditor:
 
         # Set window size
         window_width = 700
-        window_height = 300
+        window_height = 340
 
         # Get screen dimensions
         screen_width = self.window.winfo_screenwidth()
@@ -149,6 +154,8 @@ class ConfigEditor:
         # Button to set portrait as default
         self.portrait_set_btn = ttk.Button(self.window, text="SET", width=5, command=self.set_portrait_as_default)
         self.portrait_set_btn.place(x=610, y=y)
+        self.portrait_default_label = ttk.Label(self.window, text="", foreground='#555555')
+        self.portrait_default_label.place(x=140, y=y + 20, width=420)
 
         y += 36
         ttk.Label(self.window, text="Landscape photos").place(x=10, y=y)
@@ -160,6 +167,8 @@ class ConfigEditor:
         # Button to set landscape as default
         self.landscape_set_btn = ttk.Button(self.window, text="SET", width=5, command=self.set_landscape_as_default)
         self.landscape_set_btn.place(x=610, y=y)
+        self.landscape_default_label = ttk.Label(self.window, text="", foreground='#555555')
+        self.landscape_default_label.place(x=140, y=y + 20, width=420)
 
         y += 36
         ttk.Label(self.window, text="Frame orientation").place(x=10, y=y)
@@ -184,8 +193,10 @@ class ConfigEditor:
         ttk.Label(self.window, text="Change interval (sec)").place(x=10, y=y)
         # Replace spinbox with a slider from 4 to 300 seconds with 4-second steps
         self.interval_var = tk.IntVar(value=12)
+        # Bez zaokraglania do wielokrotnosci 4 - wczesniej wczytanie interwalu 11
+        # cicho zmienialo go przy zapisie na 8.
         self.interval_scale = ttk.Scale(self.window, from_=4, to=300, orient='horizontal',
-                                        command=lambda v: self.interval_var.set(int(float(v)) // 4 * 4))
+                                        command=lambda v: self.interval_var.set(int(round(float(v)))))
         self.interval_scale.place(x=140, y=y, width=520)
         # Show current value label
         self.interval_value_label = ttk.Label(self.window, textvariable=self.interval_var)
@@ -195,9 +206,19 @@ class ConfigEditor:
         self.random_var = tk.BooleanVar()
         self.random_check = ttk.Checkbutton(self.window, text="Random order", variable=self.random_var)
         self.random_check.place(x=10, y=y)
-        self.aspect_var = tk.BooleanVar(value=True)
-        self.aspect_check = ttk.Checkbutton(self.window, text="Maintain aspect ratio", variable=self.aspect_var)
-        self.aspect_check.place(x=180, y=y)
+
+        # Skalowanie: fit = cale zdjecie + czarne pasy, fill = wypelnij ekran i przytnij
+        self.scale_mode_var = tk.StringVar(value='fit')
+
+        def _toggle_scale_mode():
+            index = SCALE_MODES.index(self.scale_mode_var.get()) if self.scale_mode_var.get() in SCALE_MODES else 0
+            nxt = SCALE_MODES[(index + 1) % len(SCALE_MODES)]
+            self.scale_mode_var.set(nxt)
+            self.scale_mode_toggle.config(text=SCALE_MODE_LABELS[nxt])
+
+        self.scale_mode_toggle = ttk.Button(self.window, text=SCALE_MODE_LABELS['fit'],
+                                            command=_toggle_scale_mode)
+        self.scale_mode_toggle.place(x=140, y=y - 3, width=250)
         # Add show_time checkbox
         self.show_time_var = tk.BooleanVar(value=True)
         self.show_time_check = ttk.Checkbutton(self.window, text="Show clock", variable=self.show_time_var)
@@ -239,26 +260,17 @@ class ConfigEditor:
         save_history(history_file, history)
         dropdown_var.set(history[0])
 
-        # Config: ten sam folder jako aktywny, indeks historii spojny z nowa kolejnoscia
+        # Config: folder staje sie domyslny ORAZ aktywny, ramka przelacza sie od razu
         try:
             cfg = _config_manager.load_config(force_reload=True)
         except Exception:
             cfg = {}
-        cfg.setdefault('config', {})
-        cfg.setdefault('photos', {})
-
-        if orientation == 'portrait':
-            cfg['photos']['portrait_folder'] = folder
-            cfg['config']['PHOTO_FRAME_FOLDER_PORTRAIT'] = folder
-            cfg['config']['PORTRAIT_HISTORY_LINE'] = 0
-        else:
-            cfg['photos']['landscape_folder'] = folder
-            cfg['config']['PHOTO_FRAME_FOLDER_LANDSCAPE'] = folder
-            cfg['config']['LANDSCAPE_HISTORY_LINE'] = 0
+        section = cfg.setdefault(SECTION, {})
+        section[f'default_{orientation}_folder'] = folder
+        section[f'active_{orientation}_folder'] = folder
 
         # Ramka ma pokazywac wlasnie ten folder, wiec ustawiamy tez orientacje
-        cfg['photos']['orientation'] = orientation
-        cfg['config']['PHOTO_FRAME_ORIENTATION'] = orientation.capitalize()
+        section['orientation_portrait'] = (orientation == 'portrait')
         self.orientation_var.set(orientation.capitalize())
         try:
             self.orientation_toggle.config(text=orientation.capitalize())
@@ -269,8 +281,22 @@ class ConfigEditor:
             name = os.path.basename(folder.rstrip('/\\')) or folder
             self._set_status(f"Domyslny folder ({orientation}): {name}")
             debug_print(f"Set as default {orientation}: {folder}")
+            self._refresh_default_labels(settings(cfg))
         else:
             self._set_status("Nie udalo sie zapisac konfiguracji", error=True)
+
+    def _refresh_default_labels(self, cfg):
+        """Pokaz przy kazdym polu, ktory folder jest obecnie domyslny."""
+        for orientation, label in (('portrait', getattr(self, 'portrait_default_label', None)),
+                                   ('landscape', getattr(self, 'landscape_default_label', None))):
+            if label is None:
+                continue
+            folder = cfg.get(f'default_{orientation}_folder') or ''
+            name = os.path.basename(str(folder).rstrip('/\\')) or '-'
+            try:
+                label.config(text=f"domyslny: {name}")
+            except Exception:
+                pass
 
     def set_portrait_as_default(self):
         """Set current portrait folder as default (move to first position in history)"""
@@ -298,54 +324,43 @@ class ConfigEditor:
             debug_print(f"Error loading config: {e}", 'error')
             return
 
-        cfg = data.get('config', {})
-        # Use line numbers from config to get correct folders from history
-        portrait_line = cfg.get('PORTRAIT_HISTORY_LINE', 0)
-        landscape_line = cfg.get('LANDSCAPE_HISTORY_LINE', 0)
+        cfg = settings(data)
 
-        # Get folder based on line number, fallback to first or config value
-        if self.portrait_history and portrait_line < len(self.portrait_history):
-            portrait_folder = self.portrait_history[portrait_line]
-        else:
-            portrait_folder = self.portrait_history[0] if self.portrait_history else cfg.get('PHOTO_FRAME_FOLDER_PORTRAIT', cfg.get('PHOTO_FRAME_FOLDER', ''))
+        # Pola pokazuja folder AKTYWNY; historia sluzy tylko jako podpowiedzi
+        self.portrait_dropdown_var.set(
+            cfg['active_portrait_folder'] or cfg['default_portrait_folder']
+            or (self.portrait_history[0] if self.portrait_history else ''))
+        self.landscape_dropdown_var.set(
+            cfg['active_landscape_folder'] or cfg['default_landscape_folder']
+            or (self.landscape_history[0] if self.landscape_history else ''))
 
-        if self.landscape_history and landscape_line < len(self.landscape_history):
-            landscape_folder = self.landscape_history[landscape_line]
-        else:
-            landscape_folder = self.landscape_history[0] if self.landscape_history else cfg.get('PHOTO_FRAME_FOLDER_LANDSCAPE', cfg.get('PHOTO_FRAME_FOLDER', ''))
-
-        self.portrait_dropdown_var.set(portrait_folder)
-        self.landscape_dropdown_var.set(landscape_folder)
-
-        # Orientation: set toggle text accordingly
-        photos = data.get('photos', {})
-        orientation_val = str(photos.get('orientation', 'Portrait')).capitalize()
+        orientation_val = "Portrait" if cfg['orientation_portrait'] else "Landscape"
         self.orientation_var.set(orientation_val)
         try:
             self.orientation_toggle.config(text=orientation_val)
         except Exception:
             pass
-        self.rotate_var.set(cfg.get('PHOTO_FRAME_INVERSE', False))
 
-        # interval: if photos.slideshow_interval exists prefer that
-        interval_val = cfg.get('PHOTO_FRAME_INTERVAL', 10)
-        if 'slideshow_interval' in photos:
-            interval_val = photos.get('slideshow_interval')
+        self.rotate_var.set(bool(cfg['inverse']))
+
         try:
-            interval_val = int(interval_val)
-        except Exception:
-            interval_val = 10
+            interval_val = int(cfg['interval'])
+        except (TypeError, ValueError):
+            interval_val = 30
         self.interval_var.set(interval_val)
         try:
             self.interval_scale.set(interval_val)
         except Exception:
             pass
-        self.random_var.set(cfg.get('PHOTO_FRAME_RANDOM', False))
-        self.aspect_var.set(cfg.get('PHOTO_FRAME_MAINTAIN_ASPECT_RATIO', True))
 
-        # Load show_time from slideshow section
-        slideshow = data.get('slideshow', {})
-        self.show_time_var.set(slideshow.get('show_time', True))
+        self.random_var.set(bool(cfg['shuffle']))
+        self.scale_mode_var.set(cfg['scale_mode'])
+        try:
+            self.scale_mode_toggle.config(text=SCALE_MODE_LABELS[cfg['scale_mode']])
+        except Exception:
+            pass
+        self.show_time_var.set(bool(cfg['show_time']))
+        self._refresh_default_labels(cfg)
 
     def show_portrait_history_menu(self, event):
         menu = tk.Menu(self.window, tearoff=0)
@@ -411,54 +426,21 @@ class ConfigEditor:
         except Exception:
             cfg = {}
 
-        # Ensure both 'config' and 'photos' sections are present
-        cfg.setdefault('config', {})
-        cfg.setdefault('photos', {})
-        cfg.setdefault('slideshow', {})
+        section = cfg.setdefault(SECTION, {})
 
-        # Save config-level flags
-        cfg['config']['MODE'] = 'PICTURE_FRAME'
-        cfg['config']['PHOTO_FRAME_INVERSE'] = bool(self.rotate_var.get())
+        # Wybrane w oknie foldery staja sie aktywne; domyslne zmienia tylko SET
+        section['active_portrait_folder'] = self.portrait_dropdown_var.get()
+        section['active_landscape_folder'] = self.landscape_dropdown_var.get()
 
-        # Save photos section used by PhotoFrame
-        portrait_folder = self.portrait_dropdown_var.get()
-        landscape_folder = self.landscape_dropdown_var.get()
-        cfg['photos']['portrait_folder'] = portrait_folder
-        cfg['photos']['landscape_folder'] = landscape_folder
-
-        # Save line numbers of selected folders in history
+        section['orientation_portrait'] = self.orientation_var.get().lower().startswith('p')
+        section['inverse'] = bool(self.rotate_var.get())
+        section['shuffle'] = bool(self.random_var.get())
+        section['scale_mode'] = self.scale_mode_var.get()
+        section['show_time'] = bool(self.show_time_var.get())
         try:
-            portrait_line = self.portrait_history.index(portrait_folder) if portrait_folder in self.portrait_history else 0
-        except (ValueError, AttributeError):
-            portrait_line = 0
-
-        try:
-            landscape_line = self.landscape_history.index(landscape_folder) if landscape_folder in self.landscape_history else 0
-        except (ValueError, AttributeError):
-            landscape_line = 0
-
-        cfg['config']['PORTRAIT_HISTORY_LINE'] = portrait_line
-        cfg['config']['LANDSCAPE_HISTORY_LINE'] = landscape_line
-
-        cfg['photos']['orientation'] = self.orientation_var.get().lower()
-        try:
-            cfg['photos']['slideshow_interval'] = int(self.interval_var.get())
-        except Exception:
-            cfg['photos']['slideshow_interval'] = 10
-
-        # Keep backwards-compatible config keys too
-        cfg['config']['PHOTO_FRAME_FOLDER_PORTRAIT'] = portrait_folder
-        cfg['config']['PHOTO_FRAME_FOLDER_LANDSCAPE'] = landscape_folder
-        cfg['config']['PHOTO_FRAME_ORIENTATION'] = self.orientation_var.get()
-        cfg['config']['PHOTO_FRAME_INTERVAL'] = cfg['photos']['slideshow_interval']
-        cfg['config']['PHOTO_FRAME_RANDOM'] = bool(self.random_var.get())
-        cfg['config']['PHOTO_FRAME_MAINTAIN_ASPECT_RATIO'] = bool(self.aspect_var.get())
-
-        # Save slideshow section with show_time
-        cfg['slideshow']['interval'] = cfg['photos']['slideshow_interval']
-        cfg['slideshow']['show_time'] = bool(self.show_time_var.get())
-        cfg['slideshow']['show_date'] = False  # Keep date disabled
-        cfg['slideshow']['shuffle'] = bool(self.random_var.get())
+            section['interval'] = int(self.interval_var.get())
+        except (TypeError, ValueError):
+            section['interval'] = 30
 
         # Zapis atomowy, pod blokada wspoldzielona z glowna aplikacja
         if not _config_manager.save_config(cfg):

@@ -29,9 +29,16 @@ class DebugConfig:
             if config_path.exists():
                 with config_path.open("r", encoding="utf-8") as f:
                     config = yaml.safe_load(f) or {}
-                    debug_config = config.get('debug', {})
-                    cls.DEBUG_ENABLED = debug_config.get('enabled', True)
-                    cls.DEBUG_LEVEL = debug_config.get('level', 'info')
+                # Czytamy plik bezposrednio (jestesmy importowani przed
+                # ConfigManagerem), wiec obslugujemy tez uklad sprzed migracji.
+                section = config.get('photo_frame')
+                if isinstance(section, dict):
+                    cls.DEBUG_ENABLED = section.get('debug_enabled', True)
+                    cls.DEBUG_LEVEL = section.get('debug_level', 'info')
+                else:
+                    legacy = config.get('debug', {})
+                    cls.DEBUG_ENABLED = legacy.get('enabled', True)
+                    cls.DEBUG_LEVEL = legacy.get('level', 'info')
         except Exception:
             pass  # Use defaults if config loading fails
         finally:
