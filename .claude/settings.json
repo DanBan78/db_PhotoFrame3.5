@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -)"
+      "Bash(python -)",
+      "Read(//d/Github/PhotoFrame-Clean/**)",
+      "Read(//c/.Source/Programy/PhotoFrame/**)"
     ]
   }
 }

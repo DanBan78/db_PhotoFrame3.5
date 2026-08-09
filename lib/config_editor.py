@@ -105,26 +105,34 @@ def load_history(path: Path) -> list[str]:
     return []
 
 
-def save_history(path: Path, entries: list[str]):
-    """Zapisz historie folderow: najnowszy wpis jako pierwszy w pliku.
+def trim_history(entries: list[str], protected: str = '') -> list[str]:
+    """Usun duplikaty i przytnij historie do HISTORY_LIMIT.
 
-    Przy przepelnionej liscie wypada NAJSTARSZY wpis, czyli ostatni.
-    Wczesniejsza wersja obcinala liste od zlej strony - po odwroceniu brala
-    pierwsze HISTORY_LIMIT pozycji, czyli wlasnie najstarsze - wiec gdy lista
-    byla pelna, nowo wybrany folder byl po cichu gubiony.
+    Kolejnosc: najnowszy wpis jako pierwszy, przy przepelnieniu wypada
+    najstarszy - czyli ostatni.
+
+    Folder *protected* (aktualnie ustawiony jako domyslny) nigdy nie wypada,
+    nawet gdy jest najstarszy: wraca na ostatnia pozycje, a jego miejsce
+    w kolejce do usuniecia zajmuje kolejny najstarszy wpis. Bez tego mozna
+    bylo stracic z listy folder, do ktorego ramka wraca po dwukliku w ikone.
     """
+    newest_first = []
+    for e in entries:
+        if e and e not in newest_first:
+            newest_first.append(e)
+
+    kept = newest_first[:HISTORY_LIMIT]
+    if protected and protected in newest_first and protected not in kept:
+        kept[-1] = protected
+    return kept
+
+
+def save_history(path: Path, entries: list[str], protected: str = ''):
+    """Zapisz historie folderow (najnowszy pierwszy), chroniac folder domyslny."""
     try:
         ensure_tools_dir()
-        # Kolejnosc wejsciowa: najnowszy na poczatku. Duplikaty usuwamy zachowujac
-        # pierwsze (czyli najswiezsze) wystapienie.
-        newest_first = []
-        for e in entries:
-            if e and e not in newest_first:
-                newest_first.append(e)
-
-        newest_first = newest_first[:HISTORY_LIMIT]
         with path.open("w", encoding="utf-8") as f:
-            for e in newest_first:
+            for e in trim_history(entries, protected):
                 f.write(e + "\n")
     except Exception:
         pass
@@ -282,13 +290,14 @@ class ConfigEditor:
             self._set_status("Najpierw wybierz folder", error=True)
             return
 
-        # Historia: wybrany folder na pierwsze miejsce
+        # Historia: wybrany folder na pierwsze miejsce. Chronimy go od razu -
+        # od tej chwili to on jest folderem domyslnym.
         if folder in history:
             history.remove(folder)
         history.insert(0, folder)
-        del history[HISTORY_LIMIT:]
+        history[:] = trim_history(history, folder)
         dropdown.configure(values=history)
-        save_history(history_file, history)
+        save_history(history_file, history, folder)
         dropdown_var.set(history[0])
 
         # Config: folder staje sie domyslny ORAZ aktywny, ramka przelacza sie od razu
@@ -447,27 +456,38 @@ class ConfigEditor:
         if folder:
             self.select_landscape(folder)
 
+    def _default_folder(self, orientation):
+        """Folder ustawiony jako domyslny - nie moze wypasc z historii."""
+        try:
+            return settings(_config_manager.load_config()).get(
+                f'default_{orientation}_folder', '') or ''
+        except Exception:
+            return ''
+
+    def _remember_folder(self, orientation, folder, history, history_file,
+                         dropdown, dropdown_var):
+        """Dopisz folder na poczatek historii i zapisz ja na dysk."""
+        dropdown_var.set(folder)
+        if folder in history:
+            history.remove(folder)
+        history.insert(0, folder)
+        # Przycinamy tak samo jak przy zapisie, zeby lista rozwijana i plik
+        # pokazywaly dokladnie to samo.
+        history[:] = trim_history(history, self._default_folder(orientation))
+        dropdown.configure(values=history)
+        save_history(history_file, history, self._default_folder(orientation))
+
     def select_portrait(self, folder):
         if folder and os.path.exists(folder):
-            self.portrait_dropdown_var.set(folder)
-            # Nowo wybrany folder na poczatek listy - tak samo jak robi to SET.
-            # Wczesniej trafial na koniec, wiec przy pelnej liscie wypadal pierwszy.
-            if folder in self.portrait_history:
-                self.portrait_history.remove(folder)
-            self.portrait_history.insert(0, folder)
-            del self.portrait_history[HISTORY_LIMIT:]
-            self.portrait_dropdown.configure(values=self.portrait_history)
-            save_history(PORTRAIT_HISTORY, self.portrait_history)
+            self._remember_folder('portrait', folder, self.portrait_history,
+                                  PORTRAIT_HISTORY, self.portrait_dropdown,
+                                  self.portrait_dropdown_var)
 
     def select_landscape(self, folder):
         if folder and os.path.exists(folder):
-            self.landscape_dropdown_var.set(folder)
-            if folder in self.landscape_history:
-                self.landscape_history.remove(folder)
-            self.landscape_history.insert(0, folder)
-            del self.landscape_history[HISTORY_LIMIT:]
-            self.landscape_dropdown.configure(values=self.landscape_history)
-            save_history(LANDSCAPE_HISTORY, self.landscape_history)
+            self._remember_folder('landscape', folder, self.landscape_history,
+                                  LANDSCAPE_HISTORY, self.landscape_dropdown,
+                                  self.landscape_dropdown_var)
 
     def on_save_run(self):
         # Build config structure na bazie aktualnego pliku
