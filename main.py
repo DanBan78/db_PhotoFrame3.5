@@ -25,6 +25,7 @@ import pystray
 
 from lib.display import LCDDisplay
 from lib.photoframe import PhotoFrame
+from lib.single_instance import SingleInstance
 
 
 class PhotoFrameApp:
@@ -505,10 +506,20 @@ class PhotoFrameApp:
                 print(f"⚠️  Tray icon run failed: {e}")
         except Exception as e:
             print(f"⚠️  Tray icon setup failed: {e}")
+
+
 def main():
     """Main entry point"""
-    app = PhotoFrameApp()
-    return app.run()
+    instance = SingleInstance()
+    if not instance.acquire():
+        debug_print("ℹ️  Photo Frame juz dziala - zamykam druga instancje")
+        return True
+
+    try:
+        app = PhotoFrameApp()
+        return app.run()
+    finally:
+        instance.release()
 
 
 if __name__ == "__main__":
