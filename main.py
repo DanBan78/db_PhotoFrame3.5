@@ -5,6 +5,7 @@ Simple digital photo frame for Turing Smart Screen 3.5" Rev A
 import sys
 import os
 import time
+import queue
 import signal
 import subprocess
 import threading
@@ -42,9 +43,10 @@ class PhotoFrameApp:
         # Configuration editor state
         self._config_open = False
         self._config_process = None
-        
-        # Icon click throttling (1 second cooldown)
-        self._click_lock = threading.Lock()
+
+        # Kolejka polecen z zasobnika - patrz _command_worker()
+        self._commands = queue.Queue()
+        self._command_thread = None
         self._last_click_time = 0.0
 
     def initialize(self):
@@ -120,55 +122,84 @@ class PhotoFrameApp:
         except Exception as e:
             debug_print(f"Unexpected error initializing default folders: {e}", 'error')
     
-    def tray_icon_clicked(self, icon, item):
-        """Handler for tray icon click - switches to default folders with 1-second cooldown"""
+    # ------------------------------------------------------------------
+    # Kolejka polecen z zasobnika
+    #
+    # pystray na Windows wola callbacki SYNCHRONICZNIE na watku pompy
+    # komunikatow okna zasobnika (_win32.py:_on_notify). Kazda dluzsza praca -
+    # skan katalogu, zapis YAML, wyslanie klatki po porcie szeregowym (sekundy) -
+    # zamrazala wiec ikone: kolejne klikniecia ginely, menu sie nie rozwijalo.
+    # Handlery tylko wrzucaja polecenie do kolejki i natychmiast wracaja.
+    # ------------------------------------------------------------------
+
+    def _enqueue(self, command):
+        """Zlec polecenie watkowi roboczemu; pomija duplikaty juz czekajace w kolejce."""
         try:
-            current_time = time.time()
-            
-            # Log every attempt to click
-            print(f"🖱️ Tray icon clicked at {current_time}")
-            
-            # Try to acquire lock without blocking - if can't acquire, another click is processing
-            if not self._click_lock.acquire(blocking=False):
-                debug_print("⏱️ Click ignored (already processing)")
-                print("⏱️ Click ignored (already processing)")
+            if command in tuple(self._commands.queue):
+                debug_print(f"⏱️ Polecenie '{command}' juz oczekuje - pomijam")
                 return
-            
-            try:
-                # Check if within cooldown period (1 second)
-                time_since_last = current_time - self._last_click_time
-                if time_since_last < 1.0:
-                    debug_print(f"⏱️ Click ignored (cooldown active, {time_since_last:.2f}s since last)")
-                    print(f"⏱️ Click ignored (cooldown active, {time_since_last:.2f}s since last)")
-                    return
-                
-                # Update last click time BEFORE executing to block concurrent clicks
-                self._last_click_time = current_time
-                
-                # Execute switch to default folder
-                debug_print("🖱️ Tray icon clicked - switching to default folder")
-                print("✅ Processing click - switching to default folder")
-                self.switch_to_default_folder()
-                print("✅ Finished switching to default folder")
-                
-            finally:
-                self._click_lock.release()
-            
+            self._commands.put_nowait(command)
         except Exception as e:
-            debug_print(f"Error handling tray icon click: {e}", 'error')
-            print(f"❌ Error handling tray icon click: {e}")
-    
-    def switch_orientation(self, icon, item):
-        """Tray menu: Switch orientation"""
-        debug_print("🖱️ Switch orientation clicked in tray")
+            debug_print(f"Nie udalo sie zakolejkowac '{command}': {e}", 'error')
+
+    def _command_worker(self):
+        """Wykonuje polecenia z zasobnika poza watkiem pompy komunikatow."""
+        handlers = {
+            'default_folder': self._cmd_default_folder,
+            'switch_orientation': self._cmd_switch_orientation,
+            'open_config': self._cmd_open_config,
+            'exit': self._cmd_exit,
+        }
+        while True:
+            command = self._commands.get()
+            try:
+                if command is None:
+                    break
+                handler = handlers.get(command)
+                if handler is None:
+                    debug_print(f"Nieznane polecenie zasobnika: {command}", 'error')
+                    continue
+                handler()
+            except Exception as e:
+                debug_print(f"Blad podczas obslugi '{command}': {e}", 'error')
+            finally:
+                self._commands.task_done()
+
+    def _cmd_default_folder(self):
+        now = time.time()
+        if now - self._last_click_time < 1.0:
+            debug_print("⏱️ Klikniecie pominiete (cooldown 1 s)")
+            return
+        self._last_click_time = now
+        debug_print("🖱️ Tray icon clicked - switching to default folder")
+        self.switch_to_default_folder()
+
+    def _cmd_switch_orientation(self):
         if self.photoframe:
             self.photoframe.switch_orientation()
         else:
-            print("❌ No photoframe instance")
+            debug_print("❌ No photoframe instance", 'error')
+
+    def _cmd_exit(self):
+        debug_print("🛑 Exiting application...")
+        self.shutdown()
+
+    def tray_icon_clicked(self, icon, item):
+        """Lewy klik w ikone - przelacz na domyslny folder."""
+        self._enqueue('default_folder')
+
+    def switch_orientation(self, icon, item):
+        """Tray menu: Switch orientation"""
+        debug_print("🖱️ Switch orientation clicked in tray")
+        self._enqueue('switch_orientation')
 
     def _open_config_menu_only(self, icon, item):
-        """Handler only for menu item - opens config immediately"""
+        """Tray menu: Open configuration"""
         debug_print("⚙️ Configuration opened from menu")
+        self._enqueue('open_config')
+
+    def _cmd_open_config(self):
+        """Otworz edytor konfiguracji (jedna instancja na raz)."""
         # Clean up any previous process state
         if self._config_process:
             try:
@@ -217,18 +248,14 @@ class PhotoFrameApp:
 
     def exit_app(self, icon, item):
         """Tray menu: Exit application"""
-        debug_print("🛑 Exiting application...")
-        self.shutdown()
-        # Stop the tray icon which will end the application
-        if hasattr(icon, 'stop'):
-            icon.stop()
+        self._enqueue('exit')
 
     def reload_config(self):
         """Trigger reload of configuration in PhotoFrame and Display."""
         try:
             if self.photoframe:
                 ok = self.photoframe.reload_config()
-                debug_print("Reload config:", "OK" if ok else "Failed")
+                debug_print(f"Reload config: {'OK' if ok else 'Failed'}")
                 # Do not refresh configuration editor - it was closed by user
             else:
                 print("No photoframe instance to reload config")
@@ -338,7 +365,8 @@ class PhotoFrameApp:
             debug_print(f"❌ Error switching to default folder: {e}", 'error')
             print(f"❌ Error: {e}")
             # Ensure lock is released on error
-            self.photoframe._reload_lock = False
+            if self.photoframe:
+                self.photoframe._reload_lock = False
     
     def start_slideshow(self):
         """Start the photo slideshow"""
@@ -352,21 +380,32 @@ class PhotoFrameApp:
     
     def shutdown(self):
         """Shutdown application"""
+        if not self.running:
+            return
         debug_print("🛑 Shutting down...")
         self.running = False
-        
+
         # Stop slideshow
         if self.photoframe:
             self.photoframe.stop_slideshow()
-        
+
         # Clear display
         if self.display:
             self.display.close()
-        
+
         # Stop tray icon
         if self.tray_icon:
-            self.tray_icon.stop()
-        
+            try:
+                self.tray_icon.stop()
+            except Exception as e:
+                debug_print(f"Blad zatrzymywania ikony zasobnika: {e}", 'error')
+
+        # Obudz watek polecen, zeby zakonczyl petle
+        try:
+            self._commands.put_nowait(None)
+        except Exception:
+            pass
+
         debug_print("✅ Shutdown complete")
     
     def signal_handler(self, signum, frame):
@@ -389,7 +428,12 @@ class PhotoFrameApp:
             return False
         
         debug_print("🖼️  Photo Frame is running... (Press Ctrl+C to stop)")
-        
+
+        # Watek obslugujacy polecenia z zasobnika
+        self._command_thread = threading.Thread(
+            target=self._command_worker, name='tray-commands', daemon=True)
+        self._command_thread.start()
+
         # Keep main thread alive
         try:
             # Setup tray icon (best-effort)

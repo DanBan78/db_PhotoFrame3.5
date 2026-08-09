@@ -1,6 +1,7 @@
 """
 Shared debug utilities for PhotoFrame application
 """
+import sys
 import yaml
 from pathlib import Path
 
@@ -45,7 +46,26 @@ class DebugConfig:
             return
             
         if level == 'error' or cls.DEBUG_LEVEL in ['info', 'debug']:
+            cls._emit(message)
+
+    @staticmethod
+    def _emit(message):
+        """Wypisz komunikat bez ryzyka wywrocenia aplikacji.
+
+        Polska konsola Windows uzywa cp1250, ktore nie potrafi zakodowac emoji
+        obecnych w komunikatach - goly print() rzucal UnicodeEncodeError prosto
+        z callbacku zasobnika i przerywal obsluge klikniecia.
+        """
+        try:
             print(message)
+        except UnicodeEncodeError:
+            try:
+                encoding = getattr(sys.stdout, 'encoding', None) or 'ascii'
+                print(str(message).encode(encoding, 'replace').decode(encoding, 'replace'))
+            except Exception:
+                pass
+        except Exception:
+            pass
 
 # Convenience function for direct use
 def debug_print(message, level='info'):
