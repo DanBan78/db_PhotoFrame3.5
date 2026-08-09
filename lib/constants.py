@@ -2,10 +2,17 @@
 Application constants for PhotoFrame
 """
 
-# File and path constants
-DEFAULT_CONFIG_PATH = "tools/config.yaml"
-PORTRAIT_HISTORY_FILE = "tools/portrait_folders_history.txt"
-LANDSCAPE_HISTORY_FILE = "tools/landscape_folders_history.txt"
+from .paths import (
+    config_path,
+    portrait_history_path,
+    landscape_history_path,
+    resource_path,
+)
+
+# File and path constants - zawsze bezwzględne, niezależne od katalogu roboczego
+DEFAULT_CONFIG_PATH = str(config_path())
+PORTRAIT_HISTORY_FILE = str(portrait_history_path())
+LANDSCAPE_HISTORY_FILE = str(landscape_history_path())
 
 # LCD Display constants
 DEFAULT_LCD_WIDTH = 320
@@ -27,7 +34,7 @@ TEMP_IMAGE_PREFIX = "temp_display_"
 TEMP_BLACK_IMAGE = "temp_black.png"
 
 # Font constants
-DEFAULT_FONT_PATH = "res/fonts/roboto/Roboto-Bold.ttf"
+DEFAULT_FONT_PATH = str(resource_path('res', 'fonts', 'roboto', 'Roboto-Bold.ttf'))
 MIN_FONT_SIZE = 32  # Znacznie zwiększone dla lepszej czytelności
 FONT_SIZE_MULTIPLIER = 0.08  # Podwojone
 FONT_SIZE_BONUS = 24  # Znacznie zwiększone

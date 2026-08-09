@@ -5,20 +5,27 @@ Simple digital photo frame for Turing Smart Screen 3.5" Rev A
 import sys
 import os
 import time
+import queue
 import signal
 import subprocess
 import threading
-import yaml
-from pathlib import Path
 
 # Import shared utilities
 from lib.debug_utils import debug_print
 from lib.constants import *
+from lib.paths import (
+    app_dir,
+    config_path,
+    portrait_history_path,
+    landscape_history_path,
+    resource_path,
+)
 from PIL import Image
 import pystray
 
 from lib.display import LCDDisplay
 from lib.photoframe import PhotoFrame
+from lib.single_instance import SingleInstance
 
 
 class PhotoFrameApp:
@@ -37,9 +44,10 @@ class PhotoFrameApp:
         # Configuration editor state
         self._config_open = False
         self._config_process = None
-        
-        # Icon click throttling (1 second cooldown)
-        self._click_lock = threading.Lock()
+
+        # Kolejka polecen z zasobnika - patrz _command_worker()
+        self._commands = queue.Queue()
+        self._command_thread = None
         self._last_click_time = 0.0
 
     def initialize(self):
@@ -51,129 +59,153 @@ class PhotoFrameApp:
             # Initialize display
             self.display = LCDDisplay()
             if not self.display.initialize():
-                print("❌ Failed to initialize display")
+                debug_print("❌ Failed to initialize display", 'error')
                 return False
 
             # Initialize photoframe and attach display
-            self.photoframe = PhotoFrame("tools/config.yaml")
+            self.photoframe = PhotoFrame(str(config_path()))
             self.photoframe.set_display(self.display)
 
             debug_print("✅ Initialization complete")
             return True
         except Exception as e:
-            print(f"Initialization failed: {e}")
+            debug_print(f"Initialization failed: {e}", 'error')
             return False
     
     def _initialize_default_folders(self):
-        """Load top folders from history files and save their indices to config"""
+        """Uzupełnij brakujące foldery w konfiguracji pierwszym wpisem z historii.
+
+        Świadomie NIE nadpisujemy folderów wybranych przez użytkownika w edytorze -
+        wcześniejsza wersja robiła to przy każdym starcie, więc ustawienia znikały
+        po restarcie aplikacji.
+        """
         try:
-            import yaml
-            from pathlib import Path
-            
-            tools_dir = Path(__file__).parent / "tools"
-            portrait_history_file = tools_dir / "portrait_folders_history.txt"
-            landscape_history_file = tools_dir / "landscape_folders_history.txt"
-            config_file = tools_dir / "config.yaml"
-            
-            # Load history files
-            portrait_history = []
-            landscape_history = []
-            
-            if portrait_history_file.exists():
-                with portrait_history_file.open("r", encoding="utf-8") as f:
-                    portrait_history = [line.strip() for line in f.readlines() if line.strip()]
-                    
-            if landscape_history_file.exists():
-                with landscape_history_file.open("r", encoding="utf-8") as f:
-                    landscape_history = [line.strip() for line in f.readlines() if line.strip()]
-            
-            # Load existing config
-            cfg = {}
-            if config_file.exists():
-                with config_file.open("r", encoding="utf-8") as f:
-                    cfg = yaml.safe_load(f) or {}
-            
-            if 'config' not in cfg:
-                cfg['config'] = {}
-            if 'photos' not in cfg:
-                cfg['photos'] = {}
-            
-            # Set default folders (first from history) and indices
-            if portrait_history:
+            from lib.config_manager import config_manager
+
+            def _read_history(path):
+                try:
+                    if path.exists():
+                        with path.open("r", encoding="utf-8") as f:
+                            return [line.strip() for line in f if line.strip()]
+                except OSError as e:
+                    debug_print(f"Error reading history file {path}: {e}", 'error')
+                return []
+
+            portrait_history = _read_history(portrait_history_path())
+            landscape_history = _read_history(landscape_history_path())
+
+            cfg = config_manager.load_config(force_reload=True)
+            cfg.setdefault('config', {})
+            cfg.setdefault('photos', {})
+
+            def _needs_default(folder):
+                return not folder or not os.path.isdir(str(folder))
+
+            changed = False
+
+            if portrait_history and _needs_default(cfg['photos'].get('portrait_folder')):
                 cfg['photos']['portrait_folder'] = portrait_history[0]
                 cfg['config']['PHOTO_FRAME_FOLDER_PORTRAIT'] = portrait_history[0]
                 cfg['config']['PORTRAIT_HISTORY_LINE'] = 0
+                changed = True
                 debug_print(f"📁 Default portrait folder: {portrait_history[0]}")
-                
-            if landscape_history:
-                cfg['photos']['landscape_folder'] = landscape_history[0] 
+
+            if landscape_history and _needs_default(cfg['photos'].get('landscape_folder')):
+                cfg['photos']['landscape_folder'] = landscape_history[0]
                 cfg['config']['PHOTO_FRAME_FOLDER_LANDSCAPE'] = landscape_history[0]
                 cfg['config']['LANDSCAPE_HISTORY_LINE'] = 0
+                changed = True
                 debug_print(f"📁 Default landscape folder: {landscape_history[0]}")
-            
-            # Save updated config
-            with config_file.open("w", encoding="utf-8") as f:
-                yaml.safe_dump(cfg, f, sort_keys=False)
-                
-        except (FileNotFoundError, yaml.YAMLError, PermissionError) as e:
-            debug_print(f"Error accessing config files: {e}", 'error')
+
+            if changed:
+                config_manager.save_config(cfg)
+
         except Exception as e:
             debug_print(f"Unexpected error initializing default folders: {e}", 'error')
     
-    def tray_icon_clicked(self, icon, item):
-        """Handler for tray icon click - switches to default folders with 1-second cooldown"""
+    # ------------------------------------------------------------------
+    # Kolejka polecen z zasobnika
+    #
+    # pystray na Windows wola callbacki SYNCHRONICZNIE na watku pompy
+    # komunikatow okna zasobnika (_win32.py:_on_notify). Kazda dluzsza praca -
+    # skan katalogu, zapis YAML, wyslanie klatki po porcie szeregowym (sekundy) -
+    # zamrazala wiec ikone: kolejne klikniecia ginely, menu sie nie rozwijalo.
+    # Handlery tylko wrzucaja polecenie do kolejki i natychmiast wracaja.
+    # ------------------------------------------------------------------
+
+    def _enqueue(self, command):
+        """Zlec polecenie watkowi roboczemu; pomija duplikaty juz czekajace w kolejce."""
         try:
-            current_time = time.time()
-            
-            # Log every attempt to click
-            print(f"🖱️ Tray icon clicked at {current_time}")
-            
-            # Try to acquire lock without blocking - if can't acquire, another click is processing
-            if not self._click_lock.acquire(blocking=False):
-                debug_print("⏱️ Click ignored (already processing)")
-                print("⏱️ Click ignored (already processing)")
+            if command in tuple(self._commands.queue):
+                debug_print(f"⏱️ Polecenie '{command}' juz oczekuje - pomijam")
                 return
-            
-            try:
-                # Check if within cooldown period (1 second)
-                time_since_last = current_time - self._last_click_time
-                if time_since_last < 1.0:
-                    debug_print(f"⏱️ Click ignored (cooldown active, {time_since_last:.2f}s since last)")
-                    print(f"⏱️ Click ignored (cooldown active, {time_since_last:.2f}s since last)")
-                    return
-                
-                # Update last click time BEFORE executing to block concurrent clicks
-                self._last_click_time = current_time
-                
-                # Execute switch to default folder
-                debug_print("🖱️ Tray icon clicked - switching to default folder")
-                print("✅ Processing click - switching to default folder")
-                self.switch_to_default_folder()
-                print("✅ Finished switching to default folder")
-                
-            finally:
-                self._click_lock.release()
-            
+            self._commands.put_nowait(command)
         except Exception as e:
-            debug_print(f"Error handling tray icon click: {e}", 'error')
-            print(f"❌ Error handling tray icon click: {e}")
-    
-    def switch_orientation(self, icon, item):
-        """Tray menu: Switch orientation"""
-        debug_print("🖱️ Switch orientation clicked in tray")
+            debug_print(f"Nie udalo sie zakolejkowac '{command}': {e}", 'error')
+
+    def _command_worker(self):
+        """Wykonuje polecenia z zasobnika poza watkiem pompy komunikatow."""
+        handlers = {
+            'default_folder': self._cmd_default_folder,
+            'switch_orientation': self._cmd_switch_orientation,
+            'open_config': self._cmd_open_config,
+            'exit': self._cmd_exit,
+        }
+        while True:
+            command = self._commands.get()
+            try:
+                if command is None:
+                    break
+                handler = handlers.get(command)
+                if handler is None:
+                    debug_print(f"Nieznane polecenie zasobnika: {command}", 'error')
+                    continue
+                handler()
+            except Exception as e:
+                debug_print(f"Blad podczas obslugi '{command}': {e}", 'error')
+            finally:
+                self._commands.task_done()
+
+    def _cmd_default_folder(self):
+        now = time.time()
+        if now - self._last_click_time < 1.0:
+            debug_print("⏱️ Klikniecie pominiete (cooldown 1 s)")
+            return
+        self._last_click_time = now
+        debug_print("🖱️ Tray icon clicked - switching to default folder")
+        self.switch_to_default_folder()
+
+    def _cmd_switch_orientation(self):
         if self.photoframe:
             self.photoframe.switch_orientation()
         else:
-            print("❌ No photoframe instance")
+            debug_print("❌ No photoframe instance", 'error')
+
+    def _cmd_exit(self):
+        debug_print("🛑 Exiting application...")
+        self.shutdown()
+
+    def tray_icon_clicked(self, icon, item):
+        """Lewy klik w ikone - przelacz na domyslny folder."""
+        self._enqueue('default_folder')
+
+    def switch_orientation(self, icon, item):
+        """Tray menu: Switch orientation"""
+        debug_print("🖱️ Switch orientation clicked in tray")
+        self._enqueue('switch_orientation')
 
     def _open_config_menu_only(self, icon, item):
-        """Handler only for menu item - opens config immediately"""
+        """Tray menu: Open configuration"""
         debug_print("⚙️ Configuration opened from menu")
+        self._enqueue('open_config')
+
+    def _cmd_open_config(self):
+        """Otworz edytor konfiguracji (jedna instancja na raz)."""
         # Clean up any previous process state
         if self._config_process:
             try:
                 if self._config_process.poll() is None:
-                    print("⚙️ Configuration already open")
+                    debug_print("⚙️ Configuration already open")
                     return
                 else:
                     # Process finished, clean up
@@ -186,67 +218,62 @@ class PhotoFrameApp:
         if not self._config_open:
             threading.Thread(target=self._open_config_action, daemon=True).start()
         else:
-            print("⚙️ Configuration already open")
+            debug_print("⚙️ Configuration already open")
+
+    @staticmethod
+    def _editor_command():
+        """Polecenie uruchamiajace edytor konfiguracji.
+
+        W wersji zamrozonej sys.executable to PhotoFrame.exe - PyInstaller
+        ignoruje podany za nim skrypt, wiec podanie sciezki do .py uruchamialo
+        po prostu druga kopie aplikacji. Edytor jest teraz czescia paczki
+        i wolamy go wlasnym przelacznikiem --config.
+        """
+        if getattr(sys, 'frozen', False):
+            return [sys.executable, '--config']
+        return [sys.executable, os.path.abspath(__file__), '--config']
 
     def _open_config_action(self):
         """Actually open the configuration editor and track its process so only one opens."""
         try:
-            root = os.path.dirname(__file__)
-            local_editor = os.path.join(root, 'tools', 'config_editor.py')
-            if os.path.exists(local_editor):
+            command = self._editor_command()
+            creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+            try:
+                proc = subprocess.Popen(command, cwd=str(app_dir()), creationflags=creationflags)
+                self._config_process = proc
+                self._config_open = True
+                debug_print(f"⚙️  Configuration editor opened: {' '.join(command)}")
                 try:
-                    proc = subprocess.Popen([sys.executable, local_editor], cwd=root)
-                    self._config_process = proc
-                    self._config_open = True
-                    debug_print("⚙️  Configuration editor opened (tools/config_editor.py)")
-                    # Wait for process to exit
-                    try:
-                        proc.wait()
-                    except Exception:
-                        pass
+                    returncode = proc.wait()
+                except Exception:
+                    returncode = None
+                if returncode:
+                    debug_print(f"⚙️ Edytor konfiguracji zakonczyl sie kodem {returncode}", 'error')
+                else:
                     debug_print("⚙️ Configuration editor closed")
-                    # Reload configuration after editor closes
-                    self.reload_config()
-                finally:
-                    self._config_process = None
-                    self._config_open = False
-            else:
-                print("⚠️  Configuration editor not found (expected tools/config_editor.py)")
+                # Reload configuration after editor closes
+                self.reload_config()
+            finally:
+                self._config_process = None
+                self._config_open = False
         except Exception as e:
-            print(f"❌ Failed to open configuration: {e}")
+            debug_print(f"❌ Failed to open configuration: {e}", 'error')
 
     def exit_app(self, icon, item):
         """Tray menu: Exit application"""
-        debug_print("🛑 Exiting application...")
-        self.shutdown()
-        # Stop the tray icon which will end the application
-        if hasattr(icon, 'stop'):
-            icon.stop()
+        self._enqueue('exit')
 
     def reload_config(self):
         """Trigger reload of configuration in PhotoFrame and Display."""
         try:
             if self.photoframe:
                 ok = self.photoframe.reload_config()
-                debug_print("Reload config:", "OK" if ok else "Failed")
+                debug_print(f"Reload config: {'OK' if ok else 'Failed'}")
                 # Do not refresh configuration editor - it was closed by user
             else:
-                print("No photoframe instance to reload config")
+                debug_print("No photoframe instance to reload config")
         except Exception as e:
-            print(f"Error reloading config: {e}")
-
-    def _refresh_config_editor(self):
-        """Refresh the configuration editor to reflect updated settings."""
-        try:
-            root = os.path.dirname(__file__)
-            local_editor = os.path.join(root, 'tools', 'config_editor.py')
-            if os.path.exists(local_editor):
-                subprocess.Popen([sys.executable, local_editor, '--refresh'], cwd=root)
-                print("⚙️ Configuration editor refreshed")
-            else:
-                print("⚠️ Configuration editor not found")
-        except Exception as e:
-            print(f"❌ Failed to refresh configuration editor: {e}")
+            debug_print(f"Error reloading config: {e}", 'error')
 
     def switch_to_default_folder(self, icon=None, item=None):
         """Set default folder (first from history) for current orientation - ON CLICK SYSTRAY"""
@@ -257,12 +284,12 @@ class PhotoFrameApp:
             
             # Check if lock is active - if yes, exit
             if self.photoframe._reload_lock:
-                print("⏱️ Reload already in progress, ignoring click")
+                debug_print("⏱️ Reload already in progress, ignoring click")
                 return
             
             # Set lock to block slideshow loop
             self.photoframe._reload_lock = True
-            print("🔒 Lock set - blocking slideshow loop")
+            debug_print("🔒 Lock set - blocking slideshow loop")
             
             try:
                 # Get current orientation from config
@@ -271,9 +298,9 @@ class PhotoFrameApp:
                 
                 # Read appropriate history file - ALWAYS use first line (default)
                 if current_orientation.startswith('p'):  # portrait
-                    history_file = Path("tools/portrait_folders_history.txt")
+                    history_file = portrait_history_path()
                 else:  # landscape
-                    history_file = Path("tools/landscape_folders_history.txt")
+                    history_file = landscape_history_path()
                 
                 if not history_file.exists():
                     debug_print(f"History file not found: {history_file}")
@@ -294,7 +321,7 @@ class PhotoFrameApp:
                     debug_print(f"Default folder does not exist: {default_folder}")
                     return
                 
-                print(f"🔄 Setting default {current_orientation} folder: {default_folder}")
+                debug_print(f"🔄 Setting default {current_orientation} folder: {default_folder}")
                 
                 # Update config with default folders from history (first paths)
                 if current_orientation.startswith('p'):  # portrait
@@ -309,9 +336,9 @@ class PhotoFrameApp:
                 # Save config
                 from lib.config_manager import config_manager
                 if config_manager.save_config(config):
-                    print(f"✅ Config saved with default folder")
+                    debug_print(f"✅ Config saved with default folder")
                 else:
-                    print(f"❌ Failed to save config")
+                    debug_print(f"❌ Failed to save config", 'error')
                     return
                 
                 # Update photoframe's in-memory config
@@ -323,55 +350,67 @@ class PhotoFrameApp:
                     self.photoframe.current_index = 0
                     # Load first image immediately
                     self.photoframe.show_current_image_now()
-                    print(f"✅ Loaded {len(self.photoframe.current_images)} images from default folder")
+                    debug_print(f"✅ Loaded {len(self.photoframe.current_images)} images from default folder")
                     
             finally:
                 # Release lock after 1 second
                 def release_lock():
                     time.sleep(1.0)
                     self.photoframe._reload_lock = False
-                    print("🔓 Lock released after 1 second")
+                    debug_print("🔓 Lock released after 1 second")
                 
                 threading.Thread(target=release_lock, daemon=True).start()
             
         except Exception as e:
             debug_print(f"❌ Error switching to default folder: {e}", 'error')
-            print(f"❌ Error: {e}")
+            debug_print(f"❌ Error: {e}", 'error')
             # Ensure lock is released on error
-            self.photoframe._reload_lock = False
+            if self.photoframe:
+                self.photoframe._reload_lock = False
     
     def start_slideshow(self):
         """Start the photo slideshow"""
         if not self.photoframe:
-            print("❌ No photoframe instance available")
+            debug_print("❌ No photoframe instance available", 'error')
             return False
         if not self.photoframe.start_slideshow():
-            print("❌ Failed to start slideshow")
+            debug_print("❌ Failed to start slideshow", 'error')
             return False
         return True
     
     def shutdown(self):
         """Shutdown application"""
+        if not self.running:
+            return
         debug_print("🛑 Shutting down...")
         self.running = False
-        
+
         # Stop slideshow
         if self.photoframe:
             self.photoframe.stop_slideshow()
-        
+
         # Clear display
         if self.display:
             self.display.close()
-        
+
         # Stop tray icon
         if self.tray_icon:
-            self.tray_icon.stop()
-        
+            try:
+                self.tray_icon.stop()
+            except Exception as e:
+                debug_print(f"Blad zatrzymywania ikony zasobnika: {e}", 'error')
+
+        # Obudz watek polecen, zeby zakonczyl petle
+        try:
+            self._commands.put_nowait(None)
+        except Exception:
+            pass
+
         debug_print("✅ Shutdown complete")
     
     def signal_handler(self, signum, frame):
         """Handle system signals"""
-        print(f"📡 Received signal {signum}")
+        debug_print(f"📡 Received signal {signum}")
         self.shutdown()
     
     def run(self):
@@ -389,7 +428,12 @@ class PhotoFrameApp:
             return False
         
         debug_print("🖼️  Photo Frame is running... (Press Ctrl+C to stop)")
-        
+
+        # Watek obslugujacy polecenia z zasobnika
+        self._command_thread = threading.Thread(
+            target=self._command_worker, name='tray-commands', daemon=True)
+        self._command_thread.start()
+
         # Keep main thread alive
         try:
             # Setup tray icon (best-effort)
@@ -401,7 +445,7 @@ class PhotoFrameApp:
             while self.running:
                 time.sleep(1)
         except KeyboardInterrupt:
-            print("\n⌨️  Keyboard interrupt received")
+            debug_print("\n⌨️  Keyboard interrupt received")
             self.shutdown()
 
         return True
@@ -411,10 +455,10 @@ class PhotoFrameApp:
         try:
             # Ensure pystray and PIL Image are available
             if 'pystray' not in globals() or 'Image' not in globals():
-                print("⚠️  pystray or PIL not available; skipping tray icon")
+                debug_print("⚠️  pystray or PIL not available; skipping tray icon", 'error')
                 return
 
-            icon_path = os.path.join(os.path.dirname(__file__), 'res', 'icons', 'photoframe-photos', '64.png')
+            icon_path = str(resource_path('res', 'icons', 'photoframe-photos', '64.png'))
             icon_image = None
             try:
                 if os.path.exists(icon_path):
@@ -442,7 +486,7 @@ class PhotoFrameApp:
                     self.tray_icon.title = 'Photo Frame - Running'
                     self.tray_icon.menu = menu
                 except Exception as e2:
-                    print(f"⚠️  Failed to create tray icon object: {e} / {e2}")
+                    debug_print(f"⚠️  Failed to create tray icon object: {e} / {e2}", 'error')
                     self.tray_icon = None
 
             if not self.tray_icon:
@@ -458,13 +502,29 @@ class PhotoFrameApp:
                     self.tray_thread.start()
                     debug_print("✅ Tray icon started (thread)")
             except Exception as e:
-                print(f"⚠️  Tray icon run failed: {e}")
+                debug_print(f"⚠️  Tray icon run failed: {e}", 'error')
         except Exception as e:
-            print(f"⚠️  Tray icon setup failed: {e}")
+            debug_print(f"⚠️  Tray icon setup failed: {e}", 'error')
+
+
 def main():
     """Main entry point"""
-    app = PhotoFrameApp()
-    return app.run()
+    if '--config' in sys.argv[1:]:
+        # Tryb edytora konfiguracji - swiadomie bez blokady pojedynczej
+        # instancji, bo trzyma ja dzialajaca aplikacja glowna.
+        from lib.config_editor import main as run_config_editor
+        return run_config_editor() == 0
+
+    instance = SingleInstance()
+    if not instance.acquire():
+        debug_print("ℹ️  Photo Frame juz dziala - zamykam druga instancje")
+        return True
+
+    try:
+        app = PhotoFrameApp()
+        return app.run()
+    finally:
+        instance.release()
 
 
 if __name__ == "__main__":
