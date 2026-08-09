@@ -56,6 +56,9 @@ TRANSPARENT = (0, 0, 0, 0)
 DEBUG_LEVELS = ['debug', 'info', 'warning', 'error']
 DEFAULT_DEBUG_LEVEL = 'info'
 
+# Zegar jest umieszczany losowo w jednym z rogow ekranu
+CLOCK_CORNERS = ('bottom_right', 'bottom_left', 'top_right', 'top_left')
+
 # Tray icon constants
 TRAY_DOUBLE_CLICK_DELAY = 0.5  # seconds
 

@@ -4,6 +4,7 @@ Clean implementation without system monitor dependencies
 """
 
 import os
+import random
 import time
 from PIL import Image, ImageDraw, ImageFont
 from lib.lcd import lcd_comm_rev_a
@@ -23,6 +24,7 @@ class LCDDisplay:
         self.frame_orientation = ORIENTATION_PORTRAIT
         self.inverse = False
         self.scale_mode = 'fit'
+        self._last_clock_corner = None   # zeby zegar nie trafial dwa razy w ten sam rog
 
         cfg = settings(config_manager.load_config())
         self.serial_port = serial_port or cfg['com_port'] or DEFAULT_COM_PORT
@@ -147,83 +149,6 @@ class LCDDisplay:
         
         return metrics, total_h, max_w
     
-    def _create_landscape_overlay(self, overlay_layer, metrics, total_h, max_w, 
-                                  font, base_font_size, corner_radius, img_h, overlay_nudge):
-        """Create overlay for landscape orientation"""
-        # Stałe wymiary dla landscape (480x320)
-        padding = 20
-        box_w = 70   # Zmniejszone o 50% (było 140)
-        box_h = 36   # Zmniejszone o 60% (było 90) 
-        
-        # Create small RGBA box for overlay
-        box_layer = Image.new('RGBA', (box_w, box_h), (0, 0, 0, 0))
-        draw_box = ImageDraw.Draw(box_layer)
-        
-        # Draw rounded rectangle background
-        try:
-            draw_box.rounded_rectangle((0, 0, box_w, box_h), radius=corner_radius, fill=(0, 0, 0, 200))
-        except Exception:
-            draw_box.rectangle((0, 0, box_w, box_h), fill=(0, 0, 0, 200))
-        
-        # Draw text with shadow
-        yb = box_h - padding + 4  # Podniesienie o 3 piksele w górę
-        shadow_offset = max(1, int(base_font_size * 0.08)) if isinstance(font, ImageFont.FreeTypeFont) else 1
-        spacing = 4
-        
-        for txt, txt_w, txt_h in metrics:
-            xb = (box_w - txt_w) // 2
-            # Shadow
-            draw_box.text((xb + shadow_offset, yb - txt_h + shadow_offset), txt, 
-                         font=font, fill=(0, 0, 0, 200))
-            # Text - lekko szary z przezroczystością
-            draw_box.text((xb, yb - txt_h), txt, font=font, fill=(220, 220, 220, 230))
-            yb -= (txt_h + spacing)
-        
-        # Rotate and position
-        try:
-            rotated_box = box_layer.rotate(270, expand=True, resample=Image.Resampling.BICUBIC)
-        except Exception:
-            rotated_box = box_layer
-        
-        pos_x = 0
-        pos_y = max(0, img_h - rotated_box.height - overlay_nudge)
-        overlay_layer.paste(rotated_box, (pos_x, pos_y), rotated_box)
-    
-    def _create_portrait_overlay(self, draw, metrics, total_h, max_w, 
-                                font, base_font_size, corner_radius, img_w, img_h, margin, overlay_nudge):
-        """Create overlay for portrait orientation"""
-        # Stałe wymiary dla portrait (320x480)
-        padding = 20
-        box_w = 90   # Zmniejszone o 50% (było 180)
-        box_h = 44   # Zmniejszone o 60% (było 110)
-        
-        # Calculate rectangle bounds
-        rect_right = img_w - margin + padding
-        rect_left = rect_right - box_w
-        rect_bottom = img_h - margin + padding - overlay_nudge
-        rect_top = rect_bottom - box_h
-        
-        # Draw background rectangle
-        try:
-            draw.rounded_rectangle((rect_left, rect_top, rect_right, rect_bottom), 
-                                 radius=corner_radius, fill=(0, 0, 0, 200))
-        except Exception:
-            draw.rectangle((rect_left, rect_top, rect_right, rect_bottom), fill=(0, 0, 0, 200))
-        
-        # Draw text with shadow
-        y = rect_bottom - padding - 3  # Podniesienie o 3 piksele w górę
-        shadow_offset = max(1, int(base_font_size * 0.08)) if isinstance(font, ImageFont.FreeTypeFont) else 1
-        spacing = 4
-        
-        for txt, txt_w, txt_h in metrics:
-            x = img_w - margin - txt_w
-            # Shadow
-            draw.text((x + shadow_offset, y - txt_h + shadow_offset), txt, 
-                     font=font, fill=(0, 0, 0, 200))
-            # Text - lekko szary z przezroczystością
-            draw.text((x, y - txt_h), txt, font=font, fill=(220, 220, 220, 230))
-            y -= (txt_h + spacing)
-    
     def _send_image_to_lcd(self, image, with_overlay=False):
         """Send final image to LCD display
         
@@ -297,47 +222,80 @@ class LCDDisplay:
             debug_print(f"Error displaying image with overlay: {e}", 'error')
             return False
 
+    def _build_clock_box(self, metrics, total_h, max_w, font, base_font_size, corner_radius):
+        """Zbuduj prostokat zegara jako osobna warstwe RGBA (tekst poziomo)."""
+        padding = 10
+        box_w = max_w + 2 * padding
+        box_h = total_h + 2 * padding
+
+        box = Image.new('RGBA', (box_w, box_h), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(box)
+        try:
+            draw.rounded_rectangle((0, 0, box_w - 1, box_h - 1),
+                                   radius=corner_radius, fill=OVERLAY_BACKGROUND_COLOR)
+        except Exception:
+            draw.rectangle((0, 0, box_w - 1, box_h - 1), fill=OVERLAY_BACKGROUND_COLOR)
+
+        shadow_offset = max(1, int(base_font_size * SHADOW_OFFSET_MULTIPLIER)) \
+            if isinstance(font, ImageFont.FreeTypeFont) else 1
+        spacing = 4
+
+        y = padding
+        for txt, txt_w, txt_h in metrics:
+            x = (box_w - txt_w) // 2
+            draw.text((x + shadow_offset, y + shadow_offset), txt, font=font, fill=SHADOW_COLOR)
+            draw.text((x, y), txt, font=font, fill=(220, 220, 220, 230))
+            y += txt_h + spacing
+
+        return box
+
+    def _pick_clock_corner(self):
+        """Wylosuj rog dla zegara, unikajac powtorzenia poprzedniego."""
+        wybor = [c for c in CLOCK_CORNERS if c != self._last_clock_corner] or list(CLOCK_CORNERS)
+        corner = random.choice(wybor)
+        self._last_clock_corner = corner
+        return corner
+
     def _add_text_overlay(self, image, show_time):
-        """Add text overlay to image"""
+        """Nalóż zegar w losowo wybranym rogu ekranu."""
         img_w, img_h = image.size
-        
-        # Create overlay layer
-        overlay_layer = Image.new('RGBA', (img_w, img_h), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(overlay_layer)
-        
-        # Check orientation first
-        is_landscape = getattr(self, 'frame_orientation', 'Portrait') == 'Landscape'
-        
-        # Prepare font and text
+
+        overlay_layer = Image.new('RGBA', (img_w, img_h), TRANSPARENT)
+        measure = ImageDraw.Draw(overlay_layer)
+
+        is_landscape = self.frame_orientation == ORIENTATION_LANDSCAPE
         font, base_font_size = self._create_overlay_font(img_w, img_h, is_landscape)
         texts = self._prepare_overlay_texts(show_time)
-        
         if not texts:
             return image
-        
-        # Calculate layout metrics
-        metrics, total_h, max_w = self._calculate_text_metrics(texts, font, draw)
-        margin = int(max(8, min(img_w, img_h) * 0.02))
+
+        metrics, total_h, max_w = self._calculate_text_metrics(texts, font, measure)
         corner_radius = min(12, base_font_size // 2)
-        overlay_nudge = 1
-        
-        # Create overlay based on orientation
-        if getattr(self, 'frame_orientation', 'Portrait') == 'Landscape':
-            self._create_landscape_overlay(overlay_layer, metrics, total_h, max_w, 
-                                         font, base_font_size, corner_radius, img_h, overlay_nudge)
-        else:
-            self._create_portrait_overlay(draw, metrics, total_h, max_w, 
-                                        font, base_font_size, corner_radius, img_w, img_h, margin, overlay_nudge)
-        
-        # Composite overlay onto image
+        box = self._build_clock_box(metrics, total_h, max_w, font, base_font_size, corner_radius)
+
+        # Zdjecie zostalo juz obrocone pod fizyczny ekran - zegar musi przejsc
+        # te same obroty, zeby patrzacy na ramke widzial go poziomo.
+        rotation = 270 if is_landscape else 0
+        if self.inverse:
+            rotation = (rotation + 180) % 360
+        if rotation:
+            box = box.rotate(rotation, expand=True, resample=Image.Resampling.BICUBIC)
+
+        margin = int(max(MIN_OVERLAY_MARGIN, min(img_w, img_h) * MARGIN_MULTIPLIER))
+        corner = self._pick_clock_corner()
+        # Pudelko musi zmiescic sie w calosci - wczesniejszy kod liczyl prawa
+        # krawedz jako 320-9+20=331 przy szerokosci 320 i zegar byl przyciety.
+        x = margin if corner.endswith('left') else img_w - box.width - margin
+        y = margin if corner.startswith('top') else img_h - box.height - margin
+        x = max(0, min(x, img_w - box.width))
+        y = max(0, min(y, img_h - box.height))
+
+        overlay_layer.paste(box, (x, y), box)
+        debug_print(f"zegar: rog {corner}, pozycja ({x},{y}), rozmiar {box.size}")
+
         try:
-            if image.mode != 'RGBA':
-                base_img = image.convert('RGBA')
-            else:
-                base_img = image
-            
-            composed = Image.alpha_composite(base_img, overlay_layer)
-            return composed.convert('RGB')
+            base_img = image if image.mode == 'RGBA' else image.convert('RGBA')
+            return Image.alpha_composite(base_img, overlay_layer).convert('RGB')
         except Exception as e:
             debug_print(f"display_image_with_overlay: compositing overlay failed: {e}", 'error')
             return image
