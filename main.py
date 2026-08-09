@@ -200,9 +200,30 @@ class PhotoFrameApp:
         self.photoframe.show_next_image_now()
 
     def _cmd_reload_config(self):
-        """Konfiguracja zmieniona na dysku (np. przycisk SET w edytorze)."""
+        """Konfiguracja zmieniona na dysku (np. Save albo SET w edytorze)."""
+        self._apply_config_if_changed()
+
+    def _apply_config_if_changed(self):
+        """Przeladuj konfiguracje tylko raz na jeden zapis pliku.
+
+        O przeladowanie prosza dwa zrodla: watcher pliku i zamkniecie edytora.
+        Bez tego strażnika ten sam zapis byl stosowany dwa razy, a poniewaz
+        lista zdjec jest tasowana, ramka pokazywala dwa rozne zdjecia pod rzad.
+        """
+        try:
+            mtime = config_path().stat().st_mtime
+        except OSError as e:
+            debug_print(f"Nie mozna sprawdzic config.yaml: {e}", 'error')
+            return False
+
+        if self._config_mtime is not None and mtime == self._config_mtime:
+            debug_print("📋 Konfiguracja bez zmian - pomijam przeladowanie")
+            return False
+
+        self._config_mtime = mtime
         debug_print("📋 Wykryto zmiane config.yaml - przeladowuje")
         self.reload_config()
+        return True
 
     def _cmd_switch_orientation(self):
         if self.photoframe:
@@ -236,7 +257,8 @@ class PhotoFrameApp:
                 self._config_mtime = mtime
                 continue
             if mtime != self._config_mtime:
-                self._config_mtime = mtime
+                # Znacznik aktualizuje dopiero _apply_config_if_changed(), wiec
+                # rownolegle zgloszenie z zamknietego edytora nie zrobi tego drugi raz
                 self._enqueue('reload_config')
 
     def _cmd_exit(self):
@@ -332,8 +354,9 @@ class PhotoFrameApp:
                     debug_print(f"⚙️ Edytor konfiguracji zakonczyl sie kodem {returncode}", 'error')
                 else:
                     debug_print("⚙️ Configuration editor closed")
-                # Reload configuration after editor closes
-                self.reload_config()
+                # Przeladowanie idzie przez kolejke i strażnik mtime - jesli watcher
+                # zdazyl juz zastosowac ten zapis, to zgloszenie bedzie bez skutku
+                self._enqueue('reload_config')
             finally:
                 self._config_process = None
                 self._config_open = False
