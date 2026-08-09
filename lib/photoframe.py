@@ -28,6 +28,11 @@ class PhotoFrame:
         self.current_index = 0
         self.slideshow_thread = None
         self._reload_lock = False  # Lock to prevent slideshow loop reload during manual operations
+        # Wysylka klatki musi byc niepodzielna: w lcd_comm_rev_a komenda
+        # DISPLAY_BITMAP idzie poza update_queue_mutex, a dane obrazu w srodku,
+        # wiec dwa watki wysylajace naraz (pokaz slajdow + akcja z zasobnika)
+        # przeplataja sie na porcie szeregowym.
+        self._display_lock = threading.RLock()
         
     def load_config(self):
         """Load configuration using config manager"""
@@ -232,22 +237,33 @@ class PhotoFrame:
     
     def show_current_image_now(self):
         """Immediately display current image (for config changes)"""
-        if not self.current_images or not self.running or not self.display:
-            return
-        
-        image_path = self.current_images[self.current_index]
-        debug_print(f"Displaying: {os.path.basename(image_path)}")
-        try:
-            # Get show_time from slideshow section (config editor saves it there)
-            show_time = self.config.get('slideshow', {}).get('show_time', True)
-            show_date = self.config.get('slideshow', {}).get('show_date', False)
-            self.display.display_image_with_overlay(
-                image_path,
-                show_time=show_time,
-                show_date=show_date
-            )
-        except Exception as e:
-            debug_print(f"Error during immediate display: {e}", 'error')
+        with self._display_lock:
+            if not self.current_images or not self.running or not self.display:
+                return
+
+            image_path = self.current_images[self.current_index]
+            debug_print(f"Displaying: {os.path.basename(image_path)}")
+            try:
+                # Get show_time from slideshow section (config editor saves it there)
+                show_time = self.config.get('slideshow', {}).get('show_time', True)
+                show_date = self.config.get('slideshow', {}).get('show_date', False)
+                self.display.display_image_with_overlay(
+                    image_path,
+                    show_time=show_time,
+                    show_date=show_date
+                )
+            except Exception as e:
+                debug_print(f"Error during immediate display: {e}", 'error')
+
+    def show_next_image_now(self):
+        """Przejdz do nastepnego zdjecia i pokaz je od razu (pojedynczy klik w ikone)."""
+        with self._display_lock:
+            if not self.current_images or not self.running:
+                debug_print("Brak zdjec do pokazania", 'error')
+                return False
+            self.next_image()
+            self.show_current_image_now()
+            return True
     
     def previous_image(self):
         """Go to previous image"""

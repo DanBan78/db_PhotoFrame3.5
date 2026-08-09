@@ -208,43 +208,88 @@ class ConfigEditor:
         self.save_btn = ttk.Button(self.window, text="Save", command=self.on_save_run)
         self.save_btn.place(x=540, y=y, width=140, height=60)
 
+        # Potwierdzenie akcji - w wersji EXE nie ma konsoli, wiec komunikat
+        # musi byc widoczny w oknie
+        self.status_label = ttk.Label(self.window, text="", foreground='#0a7d28')
+        self.status_label.place(x=10, y=y + 20, width=520)
+
         self.load_config()
 
         # Bind right-click on browse buttons to show history
         self.portrait_btn.bind("<Button-3>", lambda e: self.show_portrait_history_menu(e))
         self.landscape_btn.bind("<Button-3>", lambda e: self.show_landscape_history_menu(e))
 
+    def _apply_default_folder(self, orientation, folder, history, history_file,
+                              dropdown, dropdown_var):
+        """Ustaw folder jako domyslny: historia + config.yaml, ze skutkiem od razu.
+
+        Sam zapis historii nie wystarcza. Wczesniej SET przestawial tylko plik
+        historii, wiec ramka dalej pokazywala stary folder, a klucz
+        *_HISTORY_LINE w configu wskazywal po przesunieciu zupelnie inny wpis.
+        """
+        if not folder:
+            self._set_status("Najpierw wybierz folder", error=True)
+            return
+
+        # Historia: wybrany folder na pierwsze miejsce
+        if folder in history:
+            history.remove(folder)
+        history.insert(0, folder)
+        dropdown.configure(values=history)
+        save_history(history_file, history)
+        dropdown_var.set(history[0])
+
+        # Config: ten sam folder jako aktywny, indeks historii spojny z nowa kolejnoscia
+        try:
+            cfg = _config_manager.load_config(force_reload=True)
+        except Exception:
+            cfg = {}
+        cfg.setdefault('config', {})
+        cfg.setdefault('photos', {})
+
+        if orientation == 'portrait':
+            cfg['photos']['portrait_folder'] = folder
+            cfg['config']['PHOTO_FRAME_FOLDER_PORTRAIT'] = folder
+            cfg['config']['PORTRAIT_HISTORY_LINE'] = 0
+        else:
+            cfg['photos']['landscape_folder'] = folder
+            cfg['config']['PHOTO_FRAME_FOLDER_LANDSCAPE'] = folder
+            cfg['config']['LANDSCAPE_HISTORY_LINE'] = 0
+
+        # Ramka ma pokazywac wlasnie ten folder, wiec ustawiamy tez orientacje
+        cfg['photos']['orientation'] = orientation
+        cfg['config']['PHOTO_FRAME_ORIENTATION'] = orientation.capitalize()
+        self.orientation_var.set(orientation.capitalize())
+        try:
+            self.orientation_toggle.config(text=orientation.capitalize())
+        except Exception:
+            pass
+
+        if _config_manager.save_config(cfg):
+            name = os.path.basename(folder.rstrip('/\\')) or folder
+            self._set_status(f"Domyslny folder ({orientation}): {name}")
+            debug_print(f"Set as default {orientation}: {folder}")
+        else:
+            self._set_status("Nie udalo sie zapisac konfiguracji", error=True)
+
     def set_portrait_as_default(self):
         """Set current portrait folder as default (move to first position in history)"""
-        folder = self.portrait_dropdown_var.get()
-        if folder:
-            # Remove from current position if exists
-            if folder in self.portrait_history:
-                self.portrait_history.remove(folder)
-            # Insert at beginning
-            self.portrait_history.insert(0, folder)
-            # Update dropdown values
-            self.portrait_dropdown.configure(values=self.portrait_history)
-            save_history(PORTRAIT_HISTORY, self.portrait_history)
-            # Update dropdown to show first item (default)
-            self.portrait_dropdown_var.set(self.portrait_history[0])
-            debug_print(f"Set as default portrait: {folder}")
+        self._apply_default_folder(
+            'portrait', self.portrait_dropdown_var.get(), self.portrait_history,
+            PORTRAIT_HISTORY, self.portrait_dropdown, self.portrait_dropdown_var)
 
     def set_landscape_as_default(self):
         """Set current landscape folder as default (move to first position in history)"""
-        folder = self.landscape_dropdown_var.get()
-        if folder:
-            # Remove from current position if exists
-            if folder in self.landscape_history:
-                self.landscape_history.remove(folder)
-            # Insert at beginning
-            self.landscape_history.insert(0, folder)
-            # Update dropdown values
-            self.landscape_dropdown.configure(values=self.landscape_history)
-            save_history(LANDSCAPE_HISTORY, self.landscape_history)
-            # Update dropdown to show first item (default)
-            self.landscape_dropdown_var.set(self.landscape_history[0])
-            debug_print(f"Set as default landscape: {folder}")
+        self._apply_default_folder(
+            'landscape', self.landscape_dropdown_var.get(), self.landscape_history,
+            LANDSCAPE_HISTORY, self.landscape_dropdown, self.landscape_dropdown_var)
+
+    def _set_status(self, text, error=False):
+        """Pokaz komunikat w oknie - w wersji EXE print nie ma gdzie trafic."""
+        try:
+            self.status_label.config(text=text, foreground='#b00020' if error else '#0a7d28')
+        except Exception:
+            pass
 
     def load_config(self):
         try:

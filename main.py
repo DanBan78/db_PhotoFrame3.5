@@ -50,6 +50,14 @@ class PhotoFrameApp:
         self._command_thread = None
         self._last_click_time = 0.0
 
+        # Rozroznianie pojedynczego i podwojnego klikniecia w ikone
+        self._click_lock = threading.Lock()
+        self._pending_clicks = 0
+        self._click_timer = None
+
+        # Sledzenie zmian config.yaml (np. przycisk SET w edytorze)
+        self._config_mtime = None
+
     def initialize(self):
         """Initialize the display and photoframe components."""
         try:
@@ -147,8 +155,10 @@ class PhotoFrameApp:
         """Wykonuje polecenia z zasobnika poza watkiem pompy komunikatow."""
         handlers = {
             'default_folder': self._cmd_default_folder,
+            'next_image': self._cmd_next_image,
             'switch_orientation': self._cmd_switch_orientation,
             'open_config': self._cmd_open_config,
+            'reload_config': self._cmd_reload_config,
             'exit': self._cmd_exit,
         }
         while True:
@@ -172,22 +182,88 @@ class PhotoFrameApp:
             debug_print("⏱️ Klikniecie pominiete (cooldown 1 s)")
             return
         self._last_click_time = now
-        debug_print("🖱️ Tray icon clicked - switching to default folder")
+        debug_print("🖱️ Podwojny klik - przelaczam na folder domyslny")
         self.switch_to_default_folder()
+        self._note_config_written()
+
+    def _cmd_next_image(self):
+        """Pojedynczy klik - pokaz nastepne zdjecie."""
+        if not self.photoframe:
+            debug_print("❌ No photoframe instance", 'error')
+            return
+        debug_print("🖱️ Pojedynczy klik - nastepne zdjecie")
+        self.photoframe.show_next_image_now()
+
+    def _cmd_reload_config(self):
+        """Konfiguracja zmieniona na dysku (np. przycisk SET w edytorze)."""
+        debug_print("📋 Wykryto zmiane config.yaml - przeladowuje")
+        self.reload_config()
 
     def _cmd_switch_orientation(self):
         if self.photoframe:
             self.photoframe.switch_orientation()
+            self._note_config_written()
         else:
             debug_print("❌ No photoframe instance", 'error')
+
+    def _note_config_written(self):
+        """Zapamietaj, ze to my zapisalismy config - watcher ma tego nie liczyc
+        jako zmiany z zewnatrz (inaczej zdjecie zmienialoby sie dwa razy)."""
+        try:
+            self._config_mtime = config_path().stat().st_mtime
+        except OSError:
+            pass
+
+    def _config_watcher(self):
+        """Pilnuje config.yaml i reaguje na zmiany z edytora (np. przycisk SET).
+
+        Pokaz slajdow sprawdza konfiguracje dopiero przed kolejnym zdjeciem,
+        czyli nawet po 40 s. Watcher skraca to do sekundy.
+        """
+        path = config_path()
+        while self.running:
+            time.sleep(1.0)
+            try:
+                mtime = path.stat().st_mtime
+            except OSError:
+                continue
+            if self._config_mtime is None:
+                self._config_mtime = mtime
+                continue
+            if mtime != self._config_mtime:
+                self._config_mtime = mtime
+                self._enqueue('reload_config')
 
     def _cmd_exit(self):
         debug_print("🛑 Exiting application...")
         self.shutdown()
 
+    # Okno, w ktorym drugie klikniecie liczy sie jako podwojny klik.
+    # Windows nie wysyla tu WM_LBUTTONDBLCLK: pystray rejestruje klase okna ze
+    # style=0, czyli bez CS_DBLCLKS (_win32.py:375), wiec dwuklik dociera jako
+    # dwa WM_LBUTTONUP i musimy go rozpoznac sami po czasie.
+    DOUBLE_CLICK_WINDOW = 0.4
+
     def tray_icon_clicked(self, icon, item):
-        """Lewy klik w ikone - przelacz na domyslny folder."""
-        self._enqueue('default_folder')
+        """Lewy klik w ikone: 1 klik = nastepne zdjecie, 2 kliki = folder domyslny."""
+        with self._click_lock:
+            self._pending_clicks += 1
+            if self._click_timer is None:
+                self._click_timer = threading.Timer(
+                    self.DOUBLE_CLICK_WINDOW, self._resolve_clicks)
+                self._click_timer.daemon = True
+                self._click_timer.start()
+
+    def _resolve_clicks(self):
+        """Po uplywie okna dwukliku zdecyduj, ktore polecenie wykonac."""
+        with self._click_lock:
+            clicks = self._pending_clicks
+            self._pending_clicks = 0
+            self._click_timer = None
+
+        if clicks <= 0:
+            return
+        self._enqueue('default_folder' if clicks >= 2 else 'next_image')
 
     def switch_orientation(self, icon, item):
         """Tray menu: Switch orientation"""
@@ -433,6 +509,11 @@ class PhotoFrameApp:
         self._command_thread = threading.Thread(
             target=self._command_worker, name='tray-commands', daemon=True)
         self._command_thread.start()
+
+        # Watek pilnujacy zmian config.yaml (edytor konfiguracji)
+        self._note_config_written()
+        threading.Thread(target=self._config_watcher, name='config-watcher',
+                         daemon=True).start()
 
         # Keep main thread alive
         try:
