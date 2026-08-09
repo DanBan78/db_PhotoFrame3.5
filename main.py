@@ -220,32 +220,44 @@ class PhotoFrameApp:
         else:
             print("⚙️ Configuration already open")
 
+    @staticmethod
+    def _editor_command():
+        """Polecenie uruchamiajace edytor konfiguracji.
+
+        W wersji zamrozonej sys.executable to PhotoFrame.exe - PyInstaller
+        ignoruje podany za nim skrypt, wiec podanie sciezki do .py uruchamialo
+        po prostu druga kopie aplikacji. Edytor jest teraz czescia paczki
+        i wolamy go wlasnym przelacznikiem --config.
+        """
+        if getattr(sys, 'frozen', False):
+            return [sys.executable, '--config']
+        return [sys.executable, os.path.abspath(__file__), '--config']
+
     def _open_config_action(self):
         """Actually open the configuration editor and track its process so only one opens."""
         try:
-            root = str(app_dir())
-            local_editor = os.path.join(root, 'tools', 'config_editor.py')
-            if os.path.exists(local_editor):
+            command = self._editor_command()
+            creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+            try:
+                proc = subprocess.Popen(command, cwd=str(app_dir()), creationflags=creationflags)
+                self._config_process = proc
+                self._config_open = True
+                debug_print(f"⚙️  Configuration editor opened: {' '.join(command)}")
                 try:
-                    proc = subprocess.Popen([sys.executable, local_editor], cwd=root)
-                    self._config_process = proc
-                    self._config_open = True
-                    debug_print("⚙️  Configuration editor opened (tools/config_editor.py)")
-                    # Wait for process to exit
-                    try:
-                        proc.wait()
-                    except Exception:
-                        pass
+                    returncode = proc.wait()
+                except Exception:
+                    returncode = None
+                if returncode:
+                    debug_print(f"⚙️ Edytor konfiguracji zakonczyl sie kodem {returncode}", 'error')
+                else:
                     debug_print("⚙️ Configuration editor closed")
-                    # Reload configuration after editor closes
-                    self.reload_config()
-                finally:
-                    self._config_process = None
-                    self._config_open = False
-            else:
-                print("⚠️  Configuration editor not found (expected tools/config_editor.py)")
+                # Reload configuration after editor closes
+                self.reload_config()
+            finally:
+                self._config_process = None
+                self._config_open = False
         except Exception as e:
-            print(f"❌ Failed to open configuration: {e}")
+            debug_print(f"❌ Failed to open configuration: {e}", 'error')
 
     def exit_app(self, icon, item):
         """Tray menu: Exit application"""
@@ -510,6 +522,12 @@ class PhotoFrameApp:
 
 def main():
     """Main entry point"""
+    if '--config' in sys.argv[1:]:
+        # Tryb edytora konfiguracji - swiadomie bez blokady pojedynczej
+        # instancji, bo trzyma ja dzialajaca aplikacja glowna.
+        from lib.config_editor import main as run_config_editor
+        return run_config_editor() == 0
+
     instance = SingleInstance()
     if not instance.acquire():
         debug_print("ℹ️  Photo Frame juz dziala - zamykam druga instancje")
