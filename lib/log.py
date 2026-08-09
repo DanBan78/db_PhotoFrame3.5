@@ -21,17 +21,25 @@
 # Configure logging format
 import locale
 import logging
+import sys
 from logging.handlers import RotatingFileHandler
+
+from .paths import log_path
 
 # use current locale for date/time formatting in logs
 locale.setlocale(locale.LC_ALL, '')
 
+_handlers = [
+    # Log in textfile max 1MB - obok EXE / w katalogu projektu, nie w CWD
+    RotatingFileHandler(str(log_path()), maxBytes=1000000, backupCount=0, encoding='utf-8'),
+]
+if sys.stderr is not None:
+    # W buildzie okienkowym (--noconsole) stderr nie istnieje
+    _handlers.append(logging.StreamHandler())
+
 logging.basicConfig(  # format='%(asctime)s [%(levelname)s] %(message)s in %(pathname)s:%(lineno)d',
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        RotatingFileHandler("log.log", maxBytes=1000000, backupCount=0),  # Log in textfile max 1MB
-        logging.StreamHandler()  # Log also in console
-    ],
+    handlers=_handlers,
     datefmt='%x %X')
 
 logger = logging.getLogger('turing')

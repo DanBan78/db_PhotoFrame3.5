@@ -6,13 +6,14 @@ Provides centralized configuration loading, validation, and management.
 import yaml
 import os
 from lib.debug_utils import debug_print
+from lib.paths import config_path as _default_config_path
 
 
 class ConfigManager:
     """Centralized configuration management"""
-    
-    def __init__(self, config_path='tools/config.yaml'):
-        self.config_path = config_path
+
+    def __init__(self, config_path=None):
+        self.config_path = str(config_path) if config_path else str(_default_config_path())
         self._config = None
     
     def load_config(self, force_reload=False, silent=False):

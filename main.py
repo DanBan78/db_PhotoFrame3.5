@@ -9,11 +9,17 @@ import signal
 import subprocess
 import threading
 import yaml
-from pathlib import Path
 
 # Import shared utilities
 from lib.debug_utils import debug_print
 from lib.constants import *
+from lib.paths import (
+    app_dir,
+    config_path,
+    portrait_history_path,
+    landscape_history_path,
+    resource_path,
+)
 from PIL import Image
 import pystray
 
@@ -55,7 +61,7 @@ class PhotoFrameApp:
                 return False
 
             # Initialize photoframe and attach display
-            self.photoframe = PhotoFrame("tools/config.yaml")
+            self.photoframe = PhotoFrame(str(config_path()))
             self.photoframe.set_display(self.display)
 
             debug_print("✅ Initialization complete")
@@ -67,14 +73,11 @@ class PhotoFrameApp:
     def _initialize_default_folders(self):
         """Load top folders from history files and save their indices to config"""
         try:
-            import yaml
-            from pathlib import Path
-            
-            tools_dir = Path(__file__).parent / "tools"
-            portrait_history_file = tools_dir / "portrait_folders_history.txt"
-            landscape_history_file = tools_dir / "landscape_folders_history.txt"
-            config_file = tools_dir / "config.yaml"
-            
+            portrait_history_file = portrait_history_path()
+            landscape_history_file = landscape_history_path()
+            config_file = config_path()
+
+
             # Load history files
             portrait_history = []
             landscape_history = []
@@ -191,7 +194,7 @@ class PhotoFrameApp:
     def _open_config_action(self):
         """Actually open the configuration editor and track its process so only one opens."""
         try:
-            root = os.path.dirname(__file__)
+            root = str(app_dir())
             local_editor = os.path.join(root, 'tools', 'config_editor.py')
             if os.path.exists(local_editor):
                 try:
@@ -238,7 +241,7 @@ class PhotoFrameApp:
     def _refresh_config_editor(self):
         """Refresh the configuration editor to reflect updated settings."""
         try:
-            root = os.path.dirname(__file__)
+            root = str(app_dir())
             local_editor = os.path.join(root, 'tools', 'config_editor.py')
             if os.path.exists(local_editor):
                 subprocess.Popen([sys.executable, local_editor, '--refresh'], cwd=root)
@@ -271,9 +274,9 @@ class PhotoFrameApp:
                 
                 # Read appropriate history file - ALWAYS use first line (default)
                 if current_orientation.startswith('p'):  # portrait
-                    history_file = Path("tools/portrait_folders_history.txt")
+                    history_file = portrait_history_path()
                 else:  # landscape
-                    history_file = Path("tools/landscape_folders_history.txt")
+                    history_file = landscape_history_path()
                 
                 if not history_file.exists():
                     debug_print(f"History file not found: {history_file}")
@@ -414,7 +417,7 @@ class PhotoFrameApp:
                 print("⚠️  pystray or PIL not available; skipping tray icon")
                 return
 
-            icon_path = os.path.join(os.path.dirname(__file__), 'res', 'icons', 'photoframe-photos', '64.png')
+            icon_path = str(resource_path('res', 'icons', 'photoframe-photos', '64.png'))
             icon_image = None
             try:
                 if os.path.exists(icon_path):

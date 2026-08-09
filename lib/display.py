@@ -13,6 +13,7 @@ from lib.lcd import lcd_comm_rev_a
 # Import shared utilities
 from .debug_utils import debug_print
 from .constants import *
+from .paths import config_path as _config_path
 
 class LCDDisplay:
     def __init__(self, serial_port="COM3", brightness=85):
@@ -26,11 +27,9 @@ class LCDDisplay:
         # Prefer an external config file (next to the EXE or working directory)
         try:
             cfg = {}
-            # Simplified config path: prefer package-relative tools/config.yaml (fixed location).
-            # Fallback: current working directory if package-relative file not present.
-            cfg_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'tools', 'config.yaml'))
-            if not os.path.exists(cfg_path):
-                cfg_path = os.path.abspath('tools/config.yaml')
+            # Jedna, bezwzględna lokalizacja configu - niezależna od katalogu roboczego
+            # i od tego, czy działamy ze źródeł czy z EXE (patrz lib/paths.py).
+            cfg_path = str(_config_path())
 
             if cfg_path and os.path.exists(cfg_path):
                 try:
