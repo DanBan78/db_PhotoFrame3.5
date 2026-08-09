@@ -59,6 +59,9 @@ DEFAULT_DEBUG_LEVEL = 'info'
 # Zegar jest umieszczany losowo w jednym z rogow ekranu
 CLOCK_CORNERS = ('bottom_right', 'bottom_left', 'top_right', 'top_left')
 
+# Odstep pudelka zegara od krawedzi ekranu (w pikselach)
+CLOCK_EDGE_MARGIN = 2
+
 # Tray icon constants
 TRAY_DOUBLE_CLICK_DELAY = 0.5  # seconds
 

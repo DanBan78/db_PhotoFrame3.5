@@ -129,24 +129,30 @@ class LCDDisplay:
         return texts
     
     def _calculate_text_metrics(self, texts, font, draw):
-        """Calculate text dimensions and layout metrics"""
+        """Zmierz teksty nakladki.
+
+        Zwraca krotki (tekst, szerokosc, wysokosc, offset_x, offset_y), gdzie
+        offsety to odleglosc tuszu od punktu rysowania. Bez ich kompensacji
+        tekst siada za nisko w pudelku - dla Arial Bold 24 px tusz zaczyna sie
+        dopiero 5 px pod punktem podanym w draw.text().
+        """
         metrics = []
         total_h = 0
         max_w = 0
         spacing = 4  # Simple fixed spacing
-        
+
         for txt in reversed(texts):
             bbox = draw.textbbox((0, 0), txt, font=font)
             txt_w = bbox[2] - bbox[0]
             txt_h = bbox[3] - bbox[1]
-            metrics.append((txt, txt_w, txt_h))
+            metrics.append((txt, txt_w, txt_h, bbox[0], bbox[1]))
             total_h += txt_h + spacing
             if txt_w > max_w:
                 max_w = txt_w
-        
+
         if total_h > 0:
             total_h -= spacing
-        
+
         return metrics, total_h, max_w
     
     def _send_image_to_lcd(self, image, with_overlay=False):
@@ -241,10 +247,13 @@ class LCDDisplay:
         spacing = 4
 
         y = padding
-        for txt, txt_w, txt_h in metrics:
-            x = (box_w - txt_w) // 2
-            draw.text((x + shadow_offset, y + shadow_offset), txt, font=font, fill=SHADOW_COLOR)
-            draw.text((x, y), txt, font=font, fill=(220, 220, 220, 230))
+        for txt, txt_w, txt_h, off_x, off_y in metrics:
+            # Punkt rysowania cofamy o offset tuszu, wiec tekst ląduje dokladnie
+            # tam, gdzie go zmierzylismy - i jest realnie wysrodkowany w pudelku.
+            x = (box_w - txt_w) // 2 - off_x
+            top = y - off_y
+            draw.text((x + shadow_offset, top + shadow_offset), txt, font=font, fill=SHADOW_COLOR)
+            draw.text((x, top), txt, font=font, fill=(220, 220, 220, 230))
             y += txt_h + spacing
 
         return box
@@ -281,7 +290,7 @@ class LCDDisplay:
         if rotation:
             box = box.rotate(rotation, expand=True, resample=Image.Resampling.BICUBIC)
 
-        margin = int(max(MIN_OVERLAY_MARGIN, min(img_w, img_h) * MARGIN_MULTIPLIER))
+        margin = CLOCK_EDGE_MARGIN
         corner = self._pick_clock_corner()
         # Pudelko musi zmiescic sie w calosci - wczesniejszy kod liczyl prawa
         # krawedz jako 320-9+20=331 przy szerokosci 320 i zegar byl przyciety.
