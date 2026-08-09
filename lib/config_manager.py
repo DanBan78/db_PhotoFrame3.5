@@ -5,7 +5,10 @@ Provides centralized configuration loading, validation, and management.
 
 import yaml
 import os
+import shutil
+import tempfile
 from lib.debug_utils import debug_print
+from lib.filelock import file_lock
 from lib.paths import config_path as _default_config_path
 
 
@@ -15,62 +18,113 @@ class ConfigManager:
     def __init__(self, config_path=None):
         self.config_path = str(config_path) if config_path else str(_default_config_path())
         self._config = None
-    
+
+    @property
+    def backup_path(self):
+        return f"{self.config_path}.backup"
+
+    @property
+    def lock_path(self):
+        return f"{self.config_path}.lock"
+
+    def _read_yaml(self, path):
+        """Wczytaj plik YAML; zwraca None gdy pliku brak lub jest uszkodzony."""
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = yaml.safe_load(f)
+            if isinstance(data, dict):
+                return data
+            if data is None:
+                return {}
+            debug_print(f"Config file has unexpected structure: {path}", 'error')
+            return None
+        except FileNotFoundError:
+            return None
+        except (yaml.YAMLError, PermissionError, OSError) as e:
+            debug_print(f"Error loading config '{path}': {e}", 'error')
+            return None
+
     def load_config(self, force_reload=False, silent=False):
         """Load configuration from file with caching
-        
+
         Args:
             force_reload: Force reload from disk even if cached
             silent: Don't print debug messages (for periodic checks)
         """
         if self._config is None or force_reload:
-            try:
-                with open(self.config_path, 'r', encoding='utf-8') as f:
-                    self._config = yaml.safe_load(f) or {}
+            with file_lock(self.lock_path):
+                data = self._read_yaml(self.config_path)
+
+                if data is None:
+                    # Uszkodzony lub brakujący plik - próbujemy ostatniej dobrej kopii,
+                    # zamiast po cichu wracać do pustej konfiguracji (brak folderów
+                    # ze zdjęciami = slideshow nie wystartuje).
+                    data = self._read_yaml(self.backup_path)
+                    if data is not None:
+                        debug_print(
+                            f"Config unreadable - restored from backup {self.backup_path}",
+                            'error')
+                        self._config = data
+                        self._write_config_locked(data)
+                        return self._config.copy()
+
+                    debug_print("Config unreadable and no usable backup - using defaults", 'error')
+                    self._config = self.get_default_config()
+                    return self._config.copy()
+
+                self._config = data
                 if not silent:
                     debug_print(f"Configuration loaded from {self.config_path}")
-            except (FileNotFoundError, yaml.YAMLError, PermissionError) as e:
-                debug_print(f"Error loading config: {e}", 'error')
-                self._config = self.get_default_config()
-            except Exception as e:
-                debug_print(f"Unexpected error loading config: {e}", 'error')
-                self._config = self.get_default_config()
-        
+
         return self._config.copy()  # Return a copy to prevent external modifications
-    
-    def save_config(self, config):
-        """Save configuration to file"""
+
+    def _write_config_locked(self, config):
+        """Atomowy zapis configu. Wymaga trzymanej blokady pliku."""
+        directory = os.path.dirname(self.config_path) or '.'
+        os.makedirs(directory, exist_ok=True)
+
+        # Kopia zapasowa przez copy (nie rename) - config.yaml nigdy nie znika,
+        # więc równolegle czytający proces zawsze widzi kompletny plik.
+        if os.path.exists(self.config_path):
+            try:
+                shutil.copy2(self.config_path, self.backup_path)
+            except OSError as e:
+                debug_print(f"Could not refresh config backup: {e}", 'error')
+
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=directory, prefix='.config-', suffix='.tmp')
         try:
-            # Backup current config
-            if os.path.exists(self.config_path):
-                backup_path = f"{self.config_path}.backup"
-                # Remove old backup if exists
-                if os.path.exists(backup_path):
-                    os.remove(backup_path)
-                os.rename(self.config_path, backup_path)
-            
-            with open(self.config_path, 'w', encoding='utf-8') as f:
+            with os.fdopen(tmp_fd, 'w', encoding='utf-8') as f:
                 yaml.safe_dump(config, f, default_flow_style=False, indent=2)
-            
-            # Update cached config
-            self._config = config.copy()
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, self.config_path)  # atomowa podmiana
+        except BaseException:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
+
+    def save_config(self, config):
+        """Save configuration to file (atomically, under a cross-process lock)"""
+        if not isinstance(config, dict) or not config:
+            debug_print("Refusing to save empty configuration", 'error')
+            return False
+
+        try:
+            with file_lock(self.lock_path):
+                self._write_config_locked(config)
+                self._config = config.copy()
             debug_print(f"Configuration saved to {self.config_path}")
             return True
-            
+
         except (PermissionError, OSError) as e:
             debug_print(f"Error saving config: {e}", 'error')
-            # Restore backup if it exists
-            backup_path = f"{self.config_path}.backup"
-            if os.path.exists(backup_path):
-                try:
-                    os.rename(backup_path, self.config_path)
-                except Exception:
-                    pass
             return False
         except Exception as e:
             debug_print(f"Unexpected error saving config: {e}", 'error')
             return False
-    
+
     def get_default_config(self):
         """Get default configuration values"""
         return {

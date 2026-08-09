@@ -8,7 +8,6 @@ import time
 import signal
 import subprocess
 import threading
-import yaml
 
 # Import shared utilities
 from lib.debug_utils import debug_print
@@ -71,55 +70,53 @@ class PhotoFrameApp:
             return False
     
     def _initialize_default_folders(self):
-        """Load top folders from history files and save their indices to config"""
+        """Uzupełnij brakujące foldery w konfiguracji pierwszym wpisem z historii.
+
+        Świadomie NIE nadpisujemy folderów wybranych przez użytkownika w edytorze -
+        wcześniejsza wersja robiła to przy każdym starcie, więc ustawienia znikały
+        po restarcie aplikacji.
+        """
         try:
-            portrait_history_file = portrait_history_path()
-            landscape_history_file = landscape_history_path()
-            config_file = config_path()
+            from lib.config_manager import config_manager
 
+            def _read_history(path):
+                try:
+                    if path.exists():
+                        with path.open("r", encoding="utf-8") as f:
+                            return [line.strip() for line in f if line.strip()]
+                except OSError as e:
+                    debug_print(f"Error reading history file {path}: {e}", 'error')
+                return []
 
-            # Load history files
-            portrait_history = []
-            landscape_history = []
-            
-            if portrait_history_file.exists():
-                with portrait_history_file.open("r", encoding="utf-8") as f:
-                    portrait_history = [line.strip() for line in f.readlines() if line.strip()]
-                    
-            if landscape_history_file.exists():
-                with landscape_history_file.open("r", encoding="utf-8") as f:
-                    landscape_history = [line.strip() for line in f.readlines() if line.strip()]
-            
-            # Load existing config
-            cfg = {}
-            if config_file.exists():
-                with config_file.open("r", encoding="utf-8") as f:
-                    cfg = yaml.safe_load(f) or {}
-            
-            if 'config' not in cfg:
-                cfg['config'] = {}
-            if 'photos' not in cfg:
-                cfg['photos'] = {}
-            
-            # Set default folders (first from history) and indices
-            if portrait_history:
+            portrait_history = _read_history(portrait_history_path())
+            landscape_history = _read_history(landscape_history_path())
+
+            cfg = config_manager.load_config(force_reload=True)
+            cfg.setdefault('config', {})
+            cfg.setdefault('photos', {})
+
+            def _needs_default(folder):
+                return not folder or not os.path.isdir(str(folder))
+
+            changed = False
+
+            if portrait_history and _needs_default(cfg['photos'].get('portrait_folder')):
                 cfg['photos']['portrait_folder'] = portrait_history[0]
                 cfg['config']['PHOTO_FRAME_FOLDER_PORTRAIT'] = portrait_history[0]
                 cfg['config']['PORTRAIT_HISTORY_LINE'] = 0
+                changed = True
                 debug_print(f"📁 Default portrait folder: {portrait_history[0]}")
-                
-            if landscape_history:
-                cfg['photos']['landscape_folder'] = landscape_history[0] 
+
+            if landscape_history and _needs_default(cfg['photos'].get('landscape_folder')):
+                cfg['photos']['landscape_folder'] = landscape_history[0]
                 cfg['config']['PHOTO_FRAME_FOLDER_LANDSCAPE'] = landscape_history[0]
                 cfg['config']['LANDSCAPE_HISTORY_LINE'] = 0
+                changed = True
                 debug_print(f"📁 Default landscape folder: {landscape_history[0]}")
-            
-            # Save updated config
-            with config_file.open("w", encoding="utf-8") as f:
-                yaml.safe_dump(cfg, f, sort_keys=False)
-                
-        except (FileNotFoundError, yaml.YAMLError, PermissionError) as e:
-            debug_print(f"Error accessing config files: {e}", 'error')
+
+            if changed:
+                config_manager.save_config(cfg)
+
         except Exception as e:
             debug_print(f"Unexpected error initializing default folders: {e}", 'error')
     
