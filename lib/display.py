@@ -5,6 +5,7 @@ Clean implementation without system monitor dependencies
 
 import os
 import random
+import tempfile
 import time
 from PIL import Image, ImageDraw, ImageFont
 from lib.lcd import lcd_comm_rev_a
@@ -38,6 +39,17 @@ class LCDDisplay:
                     f"frame_orientation={self.frame_orientation}, inverse={self.inverse}, "
                     f"scale_mode={self.scale_mode}, target={self.width}x{self.height}")
         
+    @staticmethod
+    def _temp_path(name):
+        """Sciezka pliku tymczasowego w katalogu TEMP, nie w katalogu roboczym.
+
+        Pliki byly zapisywane pod nazwa wzgledna, wiec ladowaly w CWD procesu.
+        Przy starcie ze skrotu albo autostartu CWD to np. C:\\Windows i zapis
+        konczyl sie bledem "Permission denied: temp_black.png" przy kazdym
+        zamknieciu aplikacji.
+        """
+        return os.path.join(tempfile.gettempdir(), name)
+
     def initialize(self):
         """Initialize LCD connection"""
         try:
@@ -87,7 +99,7 @@ class LCDDisplay:
                 self.lcd.DisplayPILImage(image, 0, 0, image.size[0], image.size[1])
             except Exception:
                 # Fallback: try DisplayBitmap with a temporary file
-                temp_path = f"temp_display_{int(time.time())}.png"
+                temp_path = self._temp_path(f"{TEMP_IMAGE_PREFIX}{int(time.time())}.png")
                 image.save(temp_path)
                 try:
                     self.lcd.DisplayBitmap(str(temp_path), 0, 0)
@@ -192,7 +204,7 @@ class LCDDisplay:
             debug_print("No LCD connection available for fallback display", 'error')
             return False
             
-        temp_path = f"{TEMP_IMAGE_PREFIX}{int(time.time())}.png"
+        temp_path = self._temp_path(f"{TEMP_IMAGE_PREFIX}{int(time.time())}.png")
         try:
             image.save(temp_path)
             debug_print("display_image_with_overlay: DisplayPILImage failed, using DisplayBitmap fallback")
@@ -318,7 +330,7 @@ class LCDDisplay:
                 try:
                     self.lcd.DisplayPILImage(black_image, 0, 0, black_image.size[0], black_image.size[1])
                 except Exception:
-                    tmp = TEMP_BLACK_IMAGE
+                    tmp = self._temp_path(TEMP_BLACK_IMAGE)
                     black_image.save(tmp)
                     try:
                         self.lcd.DisplayBitmap(tmp, 0, 0)
