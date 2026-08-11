@@ -9,6 +9,9 @@ Format pliku (jedna plaska sekcja):
       debug_enabled: true
       debug_level: info
       show_time: false
+      show_temperature: false
+      latitude: 52.2297
+      longitude: 21.0122
       brightness: 85
       interval: 44
       orientation_portrait: true
@@ -51,6 +54,10 @@ DEFAULTS = {
     'debug_enabled': True,
     'debug_level': 'info',
     'show_time': False,
+    # Temperatura z Open-Meteo dla podanych wspolrzednych; puste = nieustawione
+    'show_temperature': False,
+    'latitude': '',
+    'longitude': '',
     'brightness': 85,
     'interval': 30,
     'orientation_portrait': True,

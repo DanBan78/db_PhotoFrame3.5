@@ -26,6 +26,7 @@ class LCDDisplay:
         self.inverse = False
         self.scale_mode = 'fit'
         self._last_clock_corner = None   # zeby zegar nie trafial dwa razy w ten sam rog
+        self._last_frame = None          # ostatnia wyslana klatka - baza dla nakladek
 
         cfg = settings(config_manager.load_config())
         self.serial_port = serial_port or cfg['com_port'] or DEFAULT_COM_PORT
@@ -176,7 +177,7 @@ class LCDDisplay:
         """
         try:
             overlay_text = " (with overlay)" if with_overlay else ""
-            debug_print(f"display_image_with_overlay: sending {image.size} image{overlay_text}, mode={image.mode}")
+            debug_print(f"wysylka: {image.size} image{overlay_text}, mode={image.mode}")
             
             # Ensure correct size for LCD
             try:
@@ -188,7 +189,7 @@ class LCDDisplay:
                 lcd_w, lcd_h = self.width, self.height
             
             if image.size != (lcd_w, lcd_h):
-                debug_print(f"display_image_with_overlay: resizing from {image.size} to {(lcd_w, lcd_h)}")
+                debug_print(f"wysylka: resizing from {image.size} to {(lcd_w, lcd_h)}")
                 image = image.resize((lcd_w, lcd_h), Image.Resampling.LANCZOS)
             
             if self.lcd:
@@ -207,7 +208,7 @@ class LCDDisplay:
         temp_path = self._temp_path(f"{TEMP_IMAGE_PREFIX}{int(time.time())}.png")
         try:
             image.save(temp_path)
-            debug_print("display_image_with_overlay: DisplayPILImage failed, using DisplayBitmap fallback")
+            debug_print("wysylka: DisplayPILImage failed, using DisplayBitmap fallback")
             self.lcd.DisplayBitmap(str(temp_path), 0, 0)
             return True
         except Exception as e:
@@ -219,8 +220,12 @@ class LCDDisplay:
             except (FileNotFoundError, PermissionError, OSError) as e:
                 debug_print(f"Could not remove temp file: {e}", 'debug')
 
-    def display_image_with_overlay(self, image_path, show_time=True):
-        """Display image with optional clock overlay"""
+    def show_photo(self, image_path):
+        """Pokaz samo zdjecie, bez zegara i temperatury.
+
+        Gotowa klatka zostaje zapamietana, zeby draw_overlays() moglo pozniej
+        dorysowac na niej nakladki bez ponownego dekodowania pliku.
+        """
         if not self.lcd:
             return False
 
@@ -228,16 +233,40 @@ class LCDDisplay:
             # _prepare_image_for_display zwraca juz obraz w rozmiarze fizycznego
             # ekranu, wiec nie ma tu ponownego skalowania (ktore wczesniej
             # znieksztalcalo kadr w trybie poziomym).
-            image = Image.open(image_path)
-            image = self._prepare_image_for_display(image)
-
-            if show_time:
-                image = self._add_text_overlay(image, show_time)
-                return self._send_image_to_lcd(image, with_overlay=True)
+            image = self._prepare_image_for_display(Image.open(image_path))
+            self._last_frame = image
             return self._send_image_to_lcd(image, with_overlay=False)
-
         except Exception as e:
-            debug_print(f"Error displaying image with overlay: {e}", 'error')
+            debug_print(f"Error displaying image: {e}", 'error')
+            self._last_frame = None
+            return False
+
+    def draw_overlays(self, show_time=True, temperature_text=''):
+        """Dorysuj zegar i temperature na juz wyswietlonym zdjeciu.
+
+        Na ekran ida tylko prostokaty samych pudelek - protokol przyjmuje
+        dowolny obszar (x, y, ex, ey), wiec nie trzeba przesylac calej klatki
+        (300 KB) po to, zeby pokazac napis wielkosci kilku kilobajtow.
+        """
+        if not self.lcd or self._last_frame is None:
+            return False
+
+        try:
+            composed, regions = self._add_text_overlay(
+                self._last_frame.copy(), show_time, temperature_text)
+            if not regions:
+                return False
+
+            for (x, y, w, h) in regions:
+                fragment = composed.crop((x, y, x + w, y + h))
+                self.lcd.DisplayPILImage(fragment, x, y, w, h)
+
+            # Zapamietujemy klatke z nakladkami - kolejne rysowanie (np. samej
+            # temperatury) nie wymaze wtedy tego, co juz jest na ekranie.
+            self._last_frame = composed
+            return True
+        except Exception as e:
+            debug_print(f"Nie udalo sie narysowac nakladek: {e}", 'error')
             return False
 
     def _build_clock_box(self, metrics, total_h, max_w, font, base_font_size, corner_radius):
@@ -277,49 +306,72 @@ class LCDDisplay:
         self._last_clock_corner = corner
         return corner
 
-    def _add_text_overlay(self, image, show_time):
-        """Nalóż zegar w losowo wybranym rogu ekranu."""
-        img_w, img_h = image.size
+    def _build_text_box(self, text, font, base_font_size, measure):
+        """Zbuduj pudelko z pojedynczym napisem, gotowe do wklejenia."""
+        metrics, total_h, max_w = self._calculate_text_metrics([text], font, measure)
+        corner_radius = min(12, base_font_size // 2)
+        box = self._build_clock_box(metrics, total_h, max_w, font, base_font_size, corner_radius)
 
+        # Zdjecie zostalo juz obrocone pod fizyczny ekran - napis musi przejsc
+        # te same obroty, zeby patrzacy na ramke widzial go poziomo.
+        rotation = 270 if self.frame_orientation == ORIENTATION_LANDSCAPE else 0
+        if self.inverse:
+            rotation = (rotation + 180) % 360
+        if rotation:
+            box = box.rotate(rotation, expand=True, resample=Image.Resampling.BICUBIC)
+        return box
+
+    @staticmethod
+    def _place_in_corner(box, corner, img_w, img_h):
+        """Pozycja pudelka w rogu, zawsze w calosci na ekranie."""
+        margin = CLOCK_EDGE_MARGIN
+        x = margin if corner.endswith('left') else img_w - box.width - margin
+        y = margin if corner.startswith('top') else img_h - box.height - margin
+        return max(0, min(x, img_w - box.width)), max(0, min(y, img_h - box.height))
+
+    def _add_text_overlay(self, image, show_time, temperature_text=''):
+        """Nalóż zegar w losowym rogu, a temperature w rogu po przekatnej.
+
+        Zwraca (obraz, obszary), gdzie obszary to prostokaty (x, y, w, h)
+        zmienione przez nakladki - pozwalaja odswiezyc na ekranie same pudelka
+        zamiast calej klatki.
+        """
+        img_w, img_h = image.size
         overlay_layer = Image.new('RGBA', (img_w, img_h), TRANSPARENT)
         measure = ImageDraw.Draw(overlay_layer)
 
         is_landscape = self.frame_orientation == ORIENTATION_LANDSCAPE
         font, base_font_size = self._create_overlay_font(img_w, img_h, is_landscape)
+
         texts = self._prepare_overlay_texts(show_time)
-        if not texts:
-            return image
+        clock_text = texts[0] if texts else ''
+        if not clock_text and not temperature_text:
+            return image, []
 
-        metrics, total_h, max_w = self._calculate_text_metrics(texts, font, measure)
-        corner_radius = min(12, base_font_size // 2)
-        box = self._build_clock_box(metrics, total_h, max_w, font, base_font_size, corner_radius)
-
-        # Zdjecie zostalo juz obrocone pod fizyczny ekran - zegar musi przejsc
-        # te same obroty, zeby patrzacy na ramke widzial go poziomo.
-        rotation = 270 if is_landscape else 0
-        if self.inverse:
-            rotation = (rotation + 180) % 360
-        if rotation:
-            box = box.rotate(rotation, expand=True, resample=Image.Resampling.BICUBIC)
-
-        margin = CLOCK_EDGE_MARGIN
+        regions = []
         corner = self._pick_clock_corner()
-        # Pudelko musi zmiescic sie w calosci - wczesniejszy kod liczyl prawa
-        # krawedz jako 320-9+20=331 przy szerokosci 320 i zegar byl przyciety.
-        x = margin if corner.endswith('left') else img_w - box.width - margin
-        y = margin if corner.startswith('top') else img_h - box.height - margin
-        x = max(0, min(x, img_w - box.width))
-        y = max(0, min(y, img_h - box.height))
 
-        overlay_layer.paste(box, (x, y), box)
-        debug_print(f"zegar: rog {corner}, pozycja ({x},{y}), rozmiar {box.size}")
+        if clock_text:
+            box = self._build_text_box(clock_text, font, base_font_size, measure)
+            x, y = self._place_in_corner(box, corner, img_w, img_h)
+            overlay_layer.paste(box, (x, y), box)
+            regions.append((x, y, box.width, box.height))
+            debug_print(f"zegar: rog {corner}, pozycja ({x},{y}), rozmiar {box.size}")
+
+        if temperature_text:
+            opposite = OPPOSITE_CORNER[corner]
+            box = self._build_text_box(temperature_text, font, base_font_size, measure)
+            x, y = self._place_in_corner(box, opposite, img_w, img_h)
+            overlay_layer.paste(box, (x, y), box)
+            regions.append((x, y, box.width, box.height))
+            debug_print(f"temperatura: rog {opposite}, pozycja ({x},{y}), rozmiar {box.size}")
 
         try:
             base_img = image if image.mode == 'RGBA' else image.convert('RGBA')
-            return Image.alpha_composite(base_img, overlay_layer).convert('RGB')
+            return Image.alpha_composite(base_img, overlay_layer).convert('RGB'), regions
         except Exception as e:
-            debug_print(f"display_image_with_overlay: compositing overlay failed: {e}", 'error')
-            return image
+            debug_print(f"nakladki: compositing failed: {e}", 'error')
+            return image, []
     
     def clear_screen(self):
         """Clear LCD screen"""

@@ -62,6 +62,17 @@ CLOCK_CORNERS = ('bottom_right', 'bottom_left', 'top_right', 'top_left')
 # Odstep pudelka zegara od krawedzi ekranu (w pikselach)
 CLOCK_EDGE_MARGIN = 2
 
+# Ile sekund po pokazaniu zdjecia dorysowac zegar i temperature
+OVERLAY_DELAY_SECONDS = 2.0
+
+# Temperatura ladauje w rogu po przekatnej wzgledem zegara
+OPPOSITE_CORNER = {
+    'bottom_right': 'top_left',
+    'top_left': 'bottom_right',
+    'bottom_left': 'top_right',
+    'top_right': 'bottom_left',
+}
+
 # Tray icon constants
 TRAY_DOUBLE_CLICK_DELAY = 0.5  # seconds
 

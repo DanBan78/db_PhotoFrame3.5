@@ -53,6 +53,21 @@ INTERVAL_MAX = 300
 INTERVAL_STEP = 4
 
 
+def _parse_coordinate(text):
+    """Zamien wpisana wspolrzedna na liczbe; puste albo bledne daje ''.
+
+    Akceptujemy przecinek jako separator dziesietny, bo tak zwykle wychodzi
+    z polskiej klawiatury.
+    """
+    text = str(text).strip().replace(',', '.')
+    if not text:
+        return ''
+    try:
+        return round(float(text), 4)
+    except ValueError:
+        return ''
+
+
 def snap_interval(value):
     """Zaokraglij interwal do najblizszej wielokrotnosci INTERVAL_STEP.
 
@@ -138,7 +153,7 @@ class ConfigEditor:
 
         # Set window size
         window_width = 700
-        window_height = 340
+        window_height = 380
 
         # Get screen dimensions
         screen_width = self.window.winfo_screenwidth()
@@ -254,6 +269,26 @@ class ConfigEditor:
         self.show_time_var = tk.BooleanVar(value=True)
         self.show_time_check = ttk.Checkbutton(self.window, text="Show clock", variable=self.show_time_var)
         self.show_time_check.place(x=410, y=y)
+
+        # Temperatura z Open-Meteo dla podanych wspolrzednych
+        y += 30
+        self.show_temperature_var = tk.BooleanVar(value=False)
+        self.show_temperature_check = ttk.Checkbutton(
+            self.window, text="Temperatura", variable=self.show_temperature_var)
+        self.show_temperature_check.place(x=10, y=y)
+
+        ttk.Label(self.window, text="szer.").place(x=140, y=y)
+        self.latitude_var = tk.StringVar()
+        self.latitude_entry = ttk.Entry(self.window, textvariable=self.latitude_var)
+        self.latitude_entry.place(x=180, y=y - 2, width=90)
+
+        ttk.Label(self.window, text="dl.").place(x=285, y=y)
+        self.longitude_var = tk.StringVar()
+        self.longitude_entry = ttk.Entry(self.window, textvariable=self.longitude_var)
+        self.longitude_entry.place(x=310, y=y - 2, width=90)
+
+        ttk.Label(self.window, text="(np. 52.2297 / 21.0122)",
+                  foreground='#555555').place(x=410, y=y)
 
         # Buttons
         y += 40
@@ -398,6 +433,9 @@ class ConfigEditor:
         except Exception:
             pass
         self.show_time_var.set(bool(cfg['show_time']))
+        self.show_temperature_var.set(bool(cfg['show_temperature']))
+        self.latitude_var.set('' if cfg['latitude'] in (None, '') else str(cfg['latitude']))
+        self.longitude_var.set('' if cfg['longitude'] in (None, '') else str(cfg['longitude']))
         self._refresh_default_labels(cfg)
 
     def show_portrait_history_menu(self, event):
@@ -491,6 +529,10 @@ class ConfigEditor:
         section['scale_mode'] = self.scale_mode_var.get()
         section['show_time'] = bool(self.show_time_var.get())
         section['interval'] = snap_interval(self.interval_var.get())
+
+        section['show_temperature'] = bool(self.show_temperature_var.get())
+        section['latitude'] = _parse_coordinate(self.latitude_var.get())
+        section['longitude'] = _parse_coordinate(self.longitude_var.get())
 
         # Zapis atomowy, pod blokada wspoldzielona z glowna aplikacja
         if not _config_manager.save_config(cfg):

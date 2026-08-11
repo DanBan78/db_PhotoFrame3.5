@@ -13,6 +13,7 @@ from pathlib import Path
 from .debug_utils import debug_print
 from .config_manager import config_manager, settings, SECTION
 from .constants import *
+from .weather import weather, format_temperature
 
 class PhotoFrame:
     def __init__(self, config_path=DEFAULT_CONFIG_PATH):
@@ -31,6 +32,9 @@ class PhotoFrame:
         # wiec dwa watki wysylajace naraz (pokaz slajdow + akcja z zasobnika)
         # przeplataja sie na porcie szeregowym.
         self._display_lock = threading.RLock()
+        # Zegar i temperatura dochodza dopiero OVERLAY_DELAY_SECONDS po zdjeciu
+        self._overlay_timer = None
+        self._frame_seq = 0
         
     def load_config(self):
         """Load configuration using config manager"""
@@ -238,12 +242,46 @@ class PhotoFrame:
             image_path = self.current_images[self.current_index]
             debug_print(f"Displaying: {os.path.basename(image_path)}")
             try:
-                self.display.display_image_with_overlay(
-                    image_path,
-                    show_time=bool(settings(self.config)['show_time'])
-                )
+                self._frame_seq += 1
+                self.display.show_photo(image_path)
+                self._schedule_overlays(self._frame_seq)
             except Exception as e:
                 debug_print(f"Error during immediate display: {e}", 'error')
+
+    def _schedule_overlays(self, seq):
+        """Zaplanuj dorysowanie zegara i temperatury na juz pokazanym zdjeciu."""
+        cfg = settings(self.config)
+        if not cfg['show_time'] and not cfg['show_temperature']:
+            return
+
+        if self._overlay_timer is not None:
+            self._overlay_timer.cancel()
+
+        timer = threading.Timer(OVERLAY_DELAY_SECONDS, self._draw_overlays, args=(seq,))
+        timer.daemon = True
+        timer.name = 'overlays'
+        timer.start()
+        self._overlay_timer = timer
+
+    def _draw_overlays(self, seq):
+        """Dorysuj nakladki, o ile zdjecie nie zmienilo sie w miedzyczasie."""
+        with self._display_lock:
+            # seq chroni przed wyscigiem: gdy w ciagu tych 2 sekund pojawilo sie
+            # nowe zdjecie, nakladki dla poprzedniego sa juz nieaktualne.
+            if seq != self._frame_seq or not self.running or not self.display:
+                return
+
+            cfg = settings(self.config)
+            temperature_text = ''
+            if cfg['show_temperature']:
+                weather.set_location(cfg['latitude'], cfg['longitude'])
+                temperature_text = format_temperature(weather.get_temperature())
+
+            try:
+                self.display.draw_overlays(show_time=bool(cfg['show_time']),
+                                           temperature_text=temperature_text)
+            except Exception as e:
+                debug_print(f"Error drawing overlays: {e}", 'error')
 
     def show_next_image_now(self):
         """Przejdz do nastepnego zdjecia i pokaz je od razu (pojedynczy klik w ikone)."""
