@@ -62,7 +62,7 @@ class PhotoFrameApp:
     def initialize(self):
         """Initialize the display and photoframe components."""
         try:
-            # Load default folders from history and update config
+            # Ustal folder startowy (domyslny) i uzupelnij braki w konfiguracji
             self._initialize_default_folders()
             
             # Initialize display
@@ -82,11 +82,12 @@ class PhotoFrameApp:
             return False
     
     def _initialize_default_folders(self):
-        """Uzupelnij brakujace foldery w konfiguracji pierwszym wpisem z historii.
+        """Ustaw foldery, od ktorych zaczyna sie pokaz po uruchomieniu.
 
-        Swiadomie NIE nadpisujemy folderow wybranych przez uzytkownika -
-        wczesniejsza wersja robila to przy kazdym starcie, wiec ustawienia
-        znikaly po restarcie aplikacji.
+        Ramka startuje z folderu DOMYSLNEGO, a nie z tego, ktory byl ogladany
+        przed zamknieciem - folder aktywny to wybor na biezaca sesje.
+        Gdy folder domyslny nie jest jeszcze ustawiony, bierzemy pierwszy wpis
+        z historii, a w ostatecznosci to, co bylo aktywne.
         """
         try:
             from lib.config_manager import config_manager
@@ -124,11 +125,13 @@ class PhotoFrameApp:
                         changed = True
                         debug_print(f"📁 Folder domyslny ({orientation}): {candidate}")
 
-                if _missing(values[active_key]) and not _missing(values[default_key]):
+                # Start zawsze od folderu domyslnego
+                if not _missing(values[default_key]) and values[active_key] != values[default_key]:
+                    debug_print(f"📁 Start od folderu domyslnego ({orientation}): "
+                                f"{values[default_key]}")
                     section[active_key] = values[default_key]
                     values[active_key] = values[default_key]
                     changed = True
-                    debug_print(f"📁 Folder aktywny ({orientation}): {values[default_key]}")
 
             if changed:
                 config_manager.save_config(cfg)
