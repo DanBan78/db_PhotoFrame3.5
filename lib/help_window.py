@@ -92,7 +92,9 @@ def format_table(rows, total_width=TEXT_WIDTH):
                 piece = wrapped[i][level] if level < len(wrapped[i]) else ''
                 cells.append(' ' + piece.ljust(widths[i]) + ' ')
             out.append('│' + '│'.join(cells) + '│')
-        if index == 0:
+        # Kreska po KAZDYM wierszu, nie tylko po naglowku. Bez niej opis
+        # zawiniety na kilka linii zlewa sie z kolejna pozycja tabeli.
+        if index < len(rows) - 1:
             out.append(line('├', '─', '┼', '┤'))
     out.append(line('└', '─', '┴', '┘'))
     return out
@@ -146,7 +148,9 @@ class HelpWindow:
                                 spacing1=16, spacing3=6, foreground='#0a4a7d')
         self.text.tag_configure('code', font=("Consolas", 10), background='#f4f4f4',
                                 lmargin1=24, lmargin2=24)
-        self.text.tag_configure('table', font=("Consolas", 9), foreground='#222222')
+        # Rozmiar 10, nie 9: przy 9 punktach glify ramek nie stykaja sie ze soba
+        # i pozioma linia wyglada na przerywana.
+        self.text.tag_configure('table', font=("Consolas", 10), foreground='#222222')
         self.text.tag_configure('bullet', lmargin1=18, lmargin2=38)
 
     def _render(self, content):
