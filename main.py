@@ -166,6 +166,7 @@ class PhotoFrameApp:
             'next_image': self._cmd_next_image,
             'switch_orientation': self._cmd_switch_orientation,
             'open_config': self._cmd_open_config,
+            'open_help': self._cmd_open_help,
             'reload_config': self._cmd_reload_config,
             'exit': self._cmd_exit,
         }
@@ -305,6 +306,21 @@ class PhotoFrameApp:
         debug_print("⚙️ Configuration opened from menu")
         self._enqueue('open_config')
 
+    def _open_help_menu(self, icon, item):
+        """Tray menu: Pomoc (README)"""
+        debug_print("❓ Pomoc otwarta z menu")
+        self._enqueue('open_help')
+
+    def _cmd_open_help(self):
+        """Otworz okno pomocy w osobnym procesie."""
+        try:
+            command = self._app_command('--help')
+            creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+            subprocess.Popen(command, cwd=str(app_dir()), creationflags=creationflags)
+            debug_print(f"❓ Okno pomocy otwarte: {' '.join(command)}")
+        except Exception as e:
+            debug_print(f"❌ Nie udalo sie otworzyc pomocy: {e}", 'error')
+
     def _cmd_open_config(self):
         """Otworz edytor konfiguracji (jedna instancja na raz)."""
         # Clean up any previous process state
@@ -327,17 +343,21 @@ class PhotoFrameApp:
             debug_print("⚙️ Configuration already open")
 
     @staticmethod
-    def _editor_command():
-        """Polecenie uruchamiajace edytor konfiguracji.
+    def _app_command(switch):
+        """Polecenie uruchamiajace te sama aplikacje z podanym przelacznikiem.
 
         W wersji zamrozonej sys.executable to PhotoFrame.exe - PyInstaller
         ignoruje podany za nim skrypt, wiec podanie sciezki do .py uruchamialo
-        po prostu druga kopie aplikacji. Edytor jest teraz czescia paczki
-        i wolamy go wlasnym przelacznikiem --config.
+        po prostu druga kopie aplikacji. Edytor i pomoc sa czescia paczki
+        i wolamy je wlasnymi przelacznikami.
         """
         if getattr(sys, 'frozen', False):
-            return [sys.executable, '--config']
-        return [sys.executable, os.path.abspath(__file__), '--config']
+            return [sys.executable, switch]
+        return [sys.executable, os.path.abspath(__file__), switch]
+
+    @classmethod
+    def _editor_command(cls):
+        return cls._app_command('--config')
 
     def _open_config_action(self):
         """Actually open the configuration editor and track its process so only one opens."""
@@ -568,6 +588,7 @@ class PhotoFrameApp:
                 pystray.MenuItem('Switch to Default Folder', self.tray_icon_clicked, default=True, visible=False),
                 pystray.MenuItem('Switch Orientation', self.switch_orientation),
                 pystray.MenuItem('Open Configuration', self._open_config_menu_only),
+                pystray.MenuItem('Pomoc (README)', self._open_help_menu),
                 pystray.MenuItem('Exit Photo Frame', self.exit_app)
             )
 
@@ -604,11 +625,17 @@ class PhotoFrameApp:
 
 def main():
     """Main entry point"""
-    if '--config' in sys.argv[1:]:
-        # Tryb edytora konfiguracji - swiadomie bez blokady pojedynczej
-        # instancji, bo trzyma ja dzialajaca aplikacja glowna.
+    # Tryby pomocnicze - swiadomie bez blokady pojedynczej instancji,
+    # bo trzyma ja dzialajaca aplikacja glowna.
+    arguments = sys.argv[1:]
+
+    if '--config' in arguments:
         from lib.config_editor import main as run_config_editor
         return run_config_editor() == 0
+
+    if '--help' in arguments or '--readme' in arguments:
+        from lib.help_window import main as run_help
+        return run_help() == 0
 
     instance = SingleInstance()
     if not instance.acquire():

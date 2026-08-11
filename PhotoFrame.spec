@@ -23,10 +23,14 @@ a = Analysis(
     binaries=[],
     datas=[
         ('res', 'res'),
+        # opis pokazywany w oknie pomocy (PhotoFrame.exe --help)
+        ('README.md', '.'),
     ],
     hiddenimports=[
         # edytor konfiguracji uruchamiany przez PhotoFrame.exe --config
         'lib.config_editor',
+        # okno pomocy uruchamiane przez PhotoFrame.exe --help
+        'lib.help_window',
         'tkinter',
         'tkinter.ttk',
         'tkinter.filedialog',
