@@ -47,7 +47,11 @@ OVERLAY_NUDGE = 1
 SHADOW_OFFSET_MULTIPLIER = 0.08
 
 # Color constants (RGBA)
-OVERLAY_BACKGROUND_COLOR = (0, 0, 0, 200)
+# Tlo pudelka zegara i temperatury - im nizsza alfa, tym bardziej przezroczyste
+OVERLAY_BACKGROUND_COLOR = (0, 0, 0, 140)
+
+# Rozmiar czcionki napisow na zdjeciu
+OVERLAY_FONT_SIZE = 22
 TEXT_COLOR = (255, 255, 255, 255)
 SHADOW_COLOR = (0, 0, 0, 200)
 TRANSPARENT = (0, 0, 0, 0)

@@ -118,7 +118,7 @@ class LCDDisplay:
         """Create font for overlay text"""
         # Użyj domyślnej czcionki systemowej PIL zamiast TTF
         # PIL domyślna czcionka zawsze działa i ma stały rozmiar
-        base_font_size = 24 if is_landscape else 24  # Zmniejszone o połowę (było 60/80)
+        base_font_size = OVERLAY_FONT_SIZE
         
         # Zamiast TTF użyj prostej czcionki PIL
         try:
