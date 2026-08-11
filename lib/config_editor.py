@@ -271,26 +271,17 @@ class ConfigEditor:
         self.portrait_btn.bind("<Button-3>", lambda e: self.show_portrait_history_menu(e))
         self.landscape_btn.bind("<Button-3>", lambda e: self.show_landscape_history_menu(e))
 
-    def _apply_default_folder(self, orientation, folder, history, history_file,
-                              dropdown, dropdown_var):
-        """Ustaw folder jako domyslny: historia + config.yaml, ze skutkiem od razu.
+    def _apply_default_folder(self, orientation, folder, dropdown_var):
+        """Ustaw folder jako domyslny w config.yaml, ze skutkiem od razu.
 
-        Sam zapis historii nie wystarcza. Wczesniej SET przestawial tylko plik
-        historii, wiec ramka dalej pokazywala stary folder, a klucz
-        *_HISTORY_LINE w configu wskazywal po przesunieciu zupelnie inny wpis.
+        SET nie dotyka historii - sciezka do folderu domyslnego zyje wylacznie
+        w konfiguracji (default_*_folder). Historia to osobna lista ostatnio
+        wskazanych folderow i nic wiecej.
         """
         if not folder:
             self._set_status("Najpierw wybierz folder", error=True)
             return
 
-        # Historia zostaje bez zmian - SET nie przestawia folderu na poczatek
-        # ani go w niej nie utrwala. Pozycja na liscie odzwierciedla kolejnosc
-        # wybierania, a sciezka do folderu domyslnego jest w config.yaml.
-        if folder not in history:
-            history.insert(0, folder)
-            history[:] = trim_history(history)
-            dropdown.configure(values=history)
-            save_history(history_file, history)
         dropdown_var.set(folder)
 
         # Config: folder staje sie domyslny ORAZ aktywny, ramka przelacza sie od razu
@@ -332,16 +323,14 @@ class ConfigEditor:
                 pass
 
     def set_portrait_as_default(self):
-        """Set current portrait folder as default (move to first position in history)"""
-        self._apply_default_folder(
-            'portrait', self.portrait_dropdown_var.get(), self.portrait_history,
-            PORTRAIT_HISTORY, self.portrait_dropdown, self.portrait_dropdown_var)
+        """SET: biezacy folder pionowy staje sie domyslny (tylko w config.yaml)."""
+        self._apply_default_folder('portrait', self.portrait_dropdown_var.get(),
+                                   self.portrait_dropdown_var)
 
     def set_landscape_as_default(self):
-        """Set current landscape folder as default (move to first position in history)"""
-        self._apply_default_folder(
-            'landscape', self.landscape_dropdown_var.get(), self.landscape_history,
-            LANDSCAPE_HISTORY, self.landscape_dropdown, self.landscape_dropdown_var)
+        """SET: biezacy folder poziomy staje sie domyslny (tylko w config.yaml)."""
+        self._apply_default_folder('landscape', self.landscape_dropdown_var.get(),
+                                   self.landscape_dropdown_var)
 
     def _on_interval_move(self, value):
         """Suwak interwalu porusza sie skokowo co INTERVAL_STEP sekund."""
@@ -480,9 +469,21 @@ class ConfigEditor:
 
         section = cfg.setdefault(SECTION, {})
 
+        portrait_folder = self.portrait_dropdown_var.get()
+        landscape_folder = self.landscape_dropdown_var.get()
+
+        # Wskazany folder zawsze laduje na gorze historii - takze wtedy, gdy
+        # zostal wybrany z listy rozwijanej, a nie przyciskiem "..."
+        if portrait_folder and os.path.isdir(portrait_folder):
+            self._remember_folder(portrait_folder, self.portrait_history, PORTRAIT_HISTORY,
+                                  self.portrait_dropdown, self.portrait_dropdown_var)
+        if landscape_folder and os.path.isdir(landscape_folder):
+            self._remember_folder(landscape_folder, self.landscape_history, LANDSCAPE_HISTORY,
+                                  self.landscape_dropdown, self.landscape_dropdown_var)
+
         # Wybrane w oknie foldery staja sie aktywne; domyslne zmienia tylko SET
-        section['active_portrait_folder'] = self.portrait_dropdown_var.get()
-        section['active_landscape_folder'] = self.landscape_dropdown_var.get()
+        section['active_portrait_folder'] = portrait_folder
+        section['active_landscape_folder'] = landscape_folder
 
         section['orientation_portrait'] = self.orientation_var.get().lower().startswith('p')
         section['inverse'] = bool(self.rotate_var.get())
